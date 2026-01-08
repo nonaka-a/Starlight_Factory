@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;800&display=swap');
 
-html, body {
+html,
+body {
     width: 100%;
     height: 100%;
     margin: 0;
@@ -33,8 +34,9 @@ body {
 /* ゲーム画面 */
 #game-container {
     position: relative;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-    border-radius: 4px 4px 0 0; /* 下側はUIとつなげるため角丸なし */
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    border-radius: 4px 4px 0 0;
+    /* 下側はUIとつなげるため角丸なし */
     overflow: hidden;
     border: 2px solid #555;
     background-color: #87CEEB;
@@ -59,25 +61,30 @@ canvas {
     box-sizing: border-box;
     border-radius: 0 0 10px 10px;
     border: 2px solid #555;
-    border-top: none; /* 上のボーダーはゲーム画面と重複するのでなし */
+    border-top: none;
+    /* 上のボーダーはゲーム画面と重複するのでなし */
 }
 
 /* 左: 十字キー */
 .dpad {
     display: grid;
-    grid-template-columns: 60px 60px 60px;
-    grid-template-rows: 50px 60px;
-    gap: 5px;
+    grid-template-columns: 75px 75px 75px;
+    grid-template-rows: 50px 75px;
+    gap: 20px;
     align-items: center;
     justify-items: center;
+    transform: translateY(-50px);
+    /* 全体を少し上に (はみ出し対策でさらに上に) */
 }
+
 .dpad-btn {
-    width: 60px; height: 60px;
+    width: 75px;
+    height: 75px;
     background: #444;
     border-radius: 12px;
     border: 2px solid #666;
     color: #fff;
-    font-size: 24px;
+    font-size: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -85,16 +92,40 @@ canvas {
     touch-action: none;
     box-shadow: 0 4px 0 #111;
 }
-.dpad-btn:active, .dpad-btn.active { 
-    background: #66aa44; 
-    border-color: #88cc66; 
+
+.dpad-btn:active,
+.dpad-btn.active {
+    background: #66aa44;
+    border-color: #88cc66;
     transform: translateY(4px);
     box-shadow: 0 0 0 #111;
 }
+
 /* グリッド配置 */
-#btn-left { grid-column: 1; grid-row: 2; }
-#btn-down { grid-column: 2; grid-row: 2; }
-#btn-right { grid-column: 3; grid-row: 2; }
+#btn-left {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+#btn-down {
+    grid-column: 2;
+    grid-row: 2;
+    transform: translateY(40px);
+    /* 左右ボタンより半分(〜ボタン半分強)下げる */
+}
+
+/* btn-down active時の上書きが必要なため、個別に定義するか、transformを合成する */
+#btn-down:active,
+#btn-down.active {
+    transform: translateY(44px);
+    /* 40px + 4px */
+}
+
+#btn-right {
+    grid-column: 3;
+    grid-row: 2;
+}
+
 /* 下キー以外も配置する場合はここに追加 */
 
 /* 中央: 機能ボタン */
@@ -103,8 +134,10 @@ canvas {
     gap: 15px;
     align-items: center;
 }
+
 .func-btn {
-    width: 50px; height: 50px;
+    width: 50px;
+    height: 50px;
     background: #555;
     border: 1px solid #777;
     color: #fff;
@@ -117,7 +150,11 @@ canvas {
     box-shadow: 0 2px 0 #111;
     touch-action: none;
 }
-.func-btn:active { transform: translateY(2px); box-shadow: 0 0 0 #111; }
+
+.func-btn:active {
+    transform: translateY(2px);
+    box-shadow: 0 0 0 #111;
+}
 
 /* 右: アクションボタン */
 .action-pad {
@@ -126,8 +163,10 @@ canvas {
     align-items: flex-end;
     padding-bottom: 10px;
 }
+
 .action-btn {
-    width: 80px; height: 80px;
+    width: 80px;
+    height: 80px;
     border-radius: 50%;
     border: 4px solid #666;
     color: #fff;
@@ -140,18 +179,32 @@ canvas {
     box-shadow: 0 6px 0 #222;
     touch-action: none;
 }
-.action-btn:active, .action-btn.active {
+
+.action-btn:active,
+.action-btn.active {
     box-shadow: 0 0 0 #222;
     transform: translateY(6px);
 }
-.btn-jump { background: #d64545; border-color: #ff6b6b; margin-bottom: 20px; } /* ジャンプは少し上に */
-.btn-attack { background: #4488dd; border-color: #66aaff; }
+
+.btn-jump {
+    background: #d64545;
+    border-color: #ff6b6b;
+    margin-bottom: 20px;
+}
+
+/* ジャンプは少し上に */
+.btn-attack {
+    background: #4488dd;
+    border-color: #66aaff;
+}
 
 /* オーバーレイ */
 .overlay {
     position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     background: rgba(0, 0, 0, 0.6);
     display: flex;
     flex-direction: column;
@@ -166,21 +219,43 @@ canvas {
     padding: 30px 50px;
     border-radius: 20px;
     text-align: center;
-    box-shadow: 0 8px 0 #ddd, 0 15px 20px rgba(0,0,0,0.2);
+    box-shadow: 0 8px 0 #ddd, 0 15px 20px rgba(0, 0, 0, 0.2);
     animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     max-width: 80%;
 }
 
 @keyframes popIn {
-    0% { transform: scale(0.5); opacity: 0; }
-    100% { transform: scale(1); opacity: 1; }
+    0% {
+        transform: scale(0.5);
+        opacity: 0;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
-h1, h2 { margin: 0 0 15px 0; color: #ff6b6b; text-shadow: 2px 2px 0 #ffd3d3; }
-h2.clear-title { color: #4ecdc4; text-shadow: 2px 2px 0 #d1f7f5; }
-p { margin-bottom: 20px; font-weight: bold; color: #555; }
+h1,
+h2 {
+    margin: 0 0 15px 0;
+    color: #ff6b6b;
+    text-shadow: 2px 2px 0 #ffd3d3;
+}
 
-button.retry-btn, .file-label {
+h2.clear-title {
+    color: #4ecdc4;
+    text-shadow: 2px 2px 0 #d1f7f5;
+}
+
+p {
+    margin-bottom: 20px;
+    font-weight: bold;
+    color: #555;
+}
+
+button.retry-btn,
+.file-label {
     background-color: #ff6b6b;
     color: white;
     border: none;
@@ -196,12 +271,21 @@ button.retry-btn, .file-label {
     font-family: inherit;
 }
 
-button.retry-btn:active, .file-label:active {
+button.retry-btn:active,
+.file-label:active {
     transform: translateY(5px);
     box-shadow: 0 0 0 #d64545;
 }
 
-button.retry-btn { background-color: #4ecdc4; box-shadow: 0 5px 0 #36b0a8; }
-button.retry-btn:active { box-shadow: 0 0 0 #36b0a8; }
+button.retry-btn {
+    background-color: #4ecdc4;
+    box-shadow: 0 5px 0 #36b0a8;
+}
 
-input[type="file"] { display: none; }
+button.retry-btn:active {
+    box-shadow: 0 0 0 #36b0a8;
+}
+
+input[type="file"] {
+    display: none;
+}
