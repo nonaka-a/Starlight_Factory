@@ -1,5 +1,5 @@
 // カメラ設定
-let CANVAS_WIDTH = 900;
+let CANVAS_WIDTH = 1000;
 let CANVAS_HEIGHT = 500;
 let ZOOM_LEVEL = 1.0;
 
@@ -64,8 +64,7 @@ function setupTouchControls() {
     bindTouch('btn-jump', 'Space');
     bindTouch('btn-attack', 'KeyB');
 
-    document.getElementById('btn-zoom-in')?.addEventListener('click', () => changeZoom(0.1));
-    document.getElementById('btn-zoom-out')?.addEventListener('click', () => changeZoom(-0.1));
+    
     document.getElementById('btn-fullscreen')?.addEventListener('click', toggleFullScreen);
     document.getElementById('btn-mute')?.addEventListener('click', toggleMute);
 }

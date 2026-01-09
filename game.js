@@ -23,7 +23,8 @@ const player = {
     state: "idle",
     animTimer: 0,
     frameIndex: 0,
-    dropTimer: 0 
+    dropTimer: 0,
+    downPressTime: 0 // 長押し計測用
 };
 
 let enemies = [];
@@ -36,13 +37,14 @@ let score = 0;
 window.onload = () => {
     canvas = document.getElementById('game-canvas');
     ctx = canvas.getContext('2d');
-    
+
     tilesetImage.src = TILESET_SRC;
     charImage.src = CHAR_SRC;
 
     document.getElementById('file-input').addEventListener('change', manualLoadMap);
-    
-    setupControls(); // engine.js
+
+    // engine.jsで定義されている setupControls を呼ぶ
+    setupControls();
     window.addEventListener('resize', fitWindow);
 
     fetch(ANIM_FILE_SRC)
@@ -60,7 +62,7 @@ window.onload = () => {
 function tryAutoLoad() {
     fetch(MAP_FILE_SRC)
         .then(res => {
-            if(!res.ok) throw new Error();
+            if (!res.ok) throw new Error();
             return res.json();
         })
         .then(data => initGameWithData(data))
@@ -95,23 +97,26 @@ function initGameWithData(json) {
         });
     }
 
+    // ★バグ修正: ID 119 (ゴール旗) がJSONでwall定義されている場合があるので強制上書き
+    tileDefs[119] = { id: 119, type: 'goal', solid: false };
+
+
     mapData = [];
-    
     if (json.layers) {
         const layerNames = ["background", "main", "foreground"];
-        for(let i=0; i<3; i++) {
+        for (let i = 0; i < 3; i++) {
             const target = json.layers.find(l => l.name === layerNames[i]);
-            if(target) {
+            if (target) {
                 mapData.push(normalizeLayer(target.data, mapCols, mapRows));
             } else {
                 mapData.push(createEmptyLayer(mapCols, mapRows));
             }
         }
     } else {
-        mapData.push(createEmptyLayer(mapCols, mapRows)); 
+        mapData.push(createEmptyLayer(mapCols, mapRows));
         const rawMap = json.map || json.data;
-        mapData.push(normalizeLayer(rawMap, mapCols, mapRows)); 
-        mapData.push(createEmptyLayer(mapCols, mapRows)); 
+        mapData.push(normalizeLayer(rawMap, mapCols, mapRows));
+        mapData.push(createEmptyLayer(mapCols, mapRows));
     }
 
     document.getElementById('screen-load').style.display = 'none';
@@ -120,9 +125,9 @@ function initGameWithData(json) {
 
 function createEmptyLayer(w, h) {
     const layer = [];
-    for(let y=0; y<h; y++) {
+    for (let y = 0; y < h; y++) {
         const row = [];
-        for(let x=0; x<w; x++) row.push({id:0, rot:0, fx:false, fy:false});
+        for (let x = 0; x < w; x++) row.push({ id: 0, rot: 0, fx: false, fy: false });
         layer.push(row);
     }
     return layer;
@@ -130,11 +135,11 @@ function createEmptyLayer(w, h) {
 
 function normalizeLayer(data, w, h) {
     const layer = [];
-    for(let y=0; y<h; y++) {
+    for (let y = 0; y < h; y++) {
         const row = [];
-        for(let x=0; x<w; x++) {
+        for (let x = 0; x < w; x++) {
             let cell = data[y][x];
-            if(typeof cell === 'number') cell = {id:cell, rot:0, fx:false, fy:false};
+            if (typeof cell === 'number') cell = { id: cell, rot: 0, fx: false, fy: false };
             row.push(cell);
         }
         layer.push(row);
@@ -159,19 +164,19 @@ function getTileId(x, y) {
 function setupGame() {
     canvas.width = CANVAS_WIDTH;
     canvas.height = CANVAS_HEIGHT;
-    
+
     const container = document.getElementById('game-container');
     container.style.width = CANVAS_WIDTH + "px";
     container.style.height = CANVAS_HEIGHT + "px";
-    
-    const ui = document.getElementById('ui-container');
-    if(ui) ui.style.width = CANVAS_WIDTH + "px";
 
-    fitWindow(); // engine.jsで定義（userScale考慮済み）
+    const ui = document.getElementById('ui-container');
+    if (ui) ui.style.width = CANVAS_WIDTH + "px";
+
+    fitWindow();
 
     score = 0;
     const st = document.getElementById('score-text');
-    if(st) st.textContent = score;
+    if (st) st.textContent = score;
 
     enemies = [];
     bullets = [];
@@ -182,8 +187,7 @@ function setupGame() {
 }
 
 function scanMapAndSetupObjects() {
-    const mainLayer = mapData[1]; 
-    
+    const mainLayer = mapData[1];
     for (let y = 0; y < mapRows; y++) {
         for (let x = 0; x < mapCols; x++) {
             const cell = mainLayer[y][x];
@@ -192,7 +196,7 @@ function scanMapAndSetupObjects() {
             if (prop.type === 'start' || cell.id === 118) {
                 player.x = x * TILE_SIZE + (TILE_SIZE - player.width) / 2;
                 player.y = y * TILE_SIZE;
-                cell.id = 0; 
+                cell.id = 0;
             }
             else if (prop.type === 'enemy') {
                 enemies.push({
@@ -201,14 +205,14 @@ function scanMapAndSetupObjects() {
                     width: TILE_SIZE,
                     height: TILE_SIZE,
                     vx: 0, vy: 0,
-                    onGround: false, 
+                    onGround: false,
                     isDead: false,
-                    tileId: cell.id, 
-                    rot: cell.rot,   
+                    tileId: cell.id,
+                    rot: cell.rot,
                     fx: cell.fx,
                     fy: cell.fy
                 });
-                cell.id = 0; 
+                cell.id = 0;
             }
         }
     }
@@ -218,13 +222,14 @@ function scanMapAndSetupObjects() {
 function gameLoop() {
     if (!isGameRunning) return;
     update();
-    updateCamera();
+    updateCamera(); // engine.js または game.js 内で定義が必要
     draw();
     requestAnimationFrame(gameLoop);
 }
 
-window.updateCamera = function() {
-    const viewportW = CANVAS_WIDTH; // 内部ズーム廃止のため等倍
+// engine.js から呼ばれる、または engine.js で定義したものを上書きする形で定義
+window.updateCamera = function () {
+    const viewportW = CANVAS_WIDTH;
     const viewportH = CANVAS_HEIGHT;
 
     let camX = player.x + player.width / 2 - viewportW / 2;
@@ -253,7 +258,7 @@ function update() {
     if (player.isDead || player.isClear) return;
 
     let newState = "idle";
-    
+
     if (player.dropTimer > 0) player.dropTimer--;
 
     if (keys.ArrowLeft) {
@@ -268,25 +273,35 @@ function update() {
         player.vx = 0;
     }
 
-    if (keys.ArrowDown && player.onGround) {
-        const checkY = player.y + player.height + 2;
-        const leftId = getTileId(player.x + 4, checkY);
-        const rightId = getTileId(player.x + player.width - 4, checkY);
-        
-        if ((leftId && TILE_HITBOX_OFFSET[leftId]) || (rightId && TILE_HITBOX_OFFSET[rightId])) {
-             player.y += 1; 
-             player.dropTimer = 10; 
-             player.onGround = false;
-        } else {
-             player.vx = 0;
-             newState = "crouch";
+    // 下キー長押し判定
+    if (keys.ArrowDown) {
+        player.downPressTime++;
+
+        if (player.onGround && player.downPressTime >= 18) {
+            const checkY = player.y + player.height + 2;
+            const leftId = getTileId(player.x + 4, checkY);
+            const rightId = getTileId(player.x + player.width - 4, checkY);
+
+            if ((leftId && TILE_HITBOX_OFFSET[leftId]) || (rightId && TILE_HITBOX_OFFSET[rightId])) {
+                player.y += 1;
+                player.dropTimer = 10;
+                player.onGround = false;
+                player.downPressTime = 0;
+            }
         }
+
+        if (player.onGround) {
+            player.vx = 0;
+            newState = "crouch";
+        }
+    } else {
+        player.downPressTime = 0;
     }
 
     if (keys.Space && player.onGround) {
         if (keys.ArrowDown) {
-            player.vy = JUMP_POWER * 1.4; 
-            AudioSys.playTone(400, 'square', 0.15, 0.1); 
+            player.vy = JUMP_POWER * 1.4;
+            AudioSys.playTone(400, 'square', 0.15, 0.1);
         } else {
             player.vy = JUMP_POWER;
             AudioSys.seJump();
@@ -354,8 +369,8 @@ function updateBullets() {
     for (let i = bullets.length - 1; i >= 0; i--) {
         const b = bullets[i];
         b.x += b.vx;
-        
-        if (isSolid(b.x + b.width/2, b.y + b.height/2)) {
+
+        if (isSolid(b.x + b.width / 2, b.y + b.height / 2)) {
             bullets.splice(i, 1);
             continue;
         }
@@ -378,7 +393,7 @@ function updateEnemies() {
     for (let i = enemies.length - 1; i >= 0; i--) {
         const e = enemies[i];
         if (e.onGround) {
-            e.vy = -6; 
+            e.vy = -6;
             e.onGround = false;
         }
         e.vy += GRAVITY;
@@ -393,11 +408,11 @@ function getTileTopY(x, y) {
     const col = Math.floor(x / TILE_SIZE);
     const row = Math.floor(y / TILE_SIZE);
     if (row < 0 || row >= mapRows || col < 0 || col >= mapCols) return null;
-    
-    const id = mapData[1][row][col].id; 
+
+    const id = mapData[1][row][col].id;
     const prop = getTileProp(id);
     if (!prop.solid) return null;
-    
+
     const offset = TILE_HITBOX_OFFSET[id] || 0;
     return row * TILE_SIZE + offset;
 }
@@ -406,8 +421,8 @@ function isSolid(x, y) {
     const col = Math.floor(x / TILE_SIZE);
     const row = Math.floor(y / TILE_SIZE);
     if (row < 0 || row >= mapRows || col < 0 || col >= mapCols) return false;
-    
-    const id = mapData[1][row][col].id; 
+
+    const id = mapData[1][row][col].id;
     const prop = getTileProp(id);
     return prop.solid;
 }
@@ -416,10 +431,10 @@ function isSolidWall(x, y) {
     const col = Math.floor(x / TILE_SIZE);
     const row = Math.floor(y / TILE_SIZE);
     if (row < 0 || row >= mapRows || col < 0 || col >= mapCols) return false;
-    
-    const id = mapData[1][row][col].id; 
+
+    const id = mapData[1][row][col].id;
     const prop = getTileProp(id);
-    
+
     if (!prop.solid) return false;
     if (TILE_HITBOX_OFFSET[id]) return false;
     return true;
@@ -429,10 +444,10 @@ function isWall(x, y) {
     const col = Math.floor(x / TILE_SIZE);
     const row = Math.floor(y / TILE_SIZE);
     if (row < 0 || row >= mapRows || col < 0 || col >= mapCols) return false;
-    
-    const id = mapData[1][row][col].id; 
+
+    const id = mapData[1][row][col].id;
     const prop = getTileProp(id);
-    
+
     if (!prop.solid) return false;
     if (TILE_HITBOX_OFFSET[id]) return false;
     return true;
@@ -455,7 +470,7 @@ function checkObjectCollisionX(obj) {
 }
 
 function checkObjectCollisionY(obj) {
-    const padding = 12; 
+    const padding = 12;
     const left = obj.x + padding;
     const right = obj.x + obj.width - padding;
     const top = obj.y;
@@ -466,7 +481,7 @@ function checkObjectCollisionY(obj) {
             obj.y = (Math.floor(top / TILE_SIZE) + 1) * TILE_SIZE;
             obj.vy = 0;
         }
-    } 
+    }
     else if (obj.vy >= 0) {
         if (obj.dropTimer > 0) return;
 
@@ -489,16 +504,14 @@ function checkObjectCollisionY(obj) {
     }
 }
 
-function checkInteraction() {
-    const centerX = player.x + player.width / 2;
-    const centerY = player.y + player.height / 2;
-    const col = Math.floor(centerX / TILE_SIZE);
-    const row = Math.floor(centerY / TILE_SIZE);
+function checkTileAt(x, y) {
+    const col = Math.floor(x / TILE_SIZE);
+    const row = Math.floor(y / TILE_SIZE);
 
     if (row >= 0 && row < mapRows && col >= 0 && col < mapCols) {
         const cell = mapData[1][row][col];
         const prop = getTileProp(cell.id);
-        
+
         if (prop.type === 'spike') {
             showGameOver();
         }
@@ -506,23 +519,37 @@ function checkInteraction() {
             showGameClear();
         }
         else if (prop.type === 'item' || prop.type === 'coin') {
-            cell.id = 0; 
+            cell.id = 0;
             AudioSys.playTone(1000, 'sine', 0.1);
             score++;
             const st = document.getElementById('score-text');
-            if(st) {
+            if (st) {
                 st.textContent = score;
                 st.parentElement.style.transform = "scale(1.2)";
-                setTimeout(()=> st.parentElement.style.transform = "scale(1.0)", 100);
+                setTimeout(() => st.parentElement.style.transform = "scale(1.0)", 100);
             }
         }
     }
+}
+
+function checkInteraction() {
+    const cx = player.x + player.width / 2;
+    const cy = player.y + player.height / 2;
+    checkTileAt(cx, cy);
+    checkTileAt(cx, player.y + player.height - 2);
 
     for (const e of enemies) {
         if (checkRectCollision(player, e)) {
             showGameOver();
         }
     }
+}
+
+function checkRectCollision(r1, r2) {
+    return r1.x < r2.x + r2.width &&
+        r1.x + r1.width > r2.x &&
+        r1.y < r2.y + r2.height &&
+        r1.y + r1.height > r2.y;
 }
 
 function showGameOver() {
@@ -540,17 +567,14 @@ function showGameClear() {
 }
 
 function draw() {
-    ctx.setTransform(1, 0, 0, 1, 0, 0); 
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     ctx.save();
-    
-    // 内部ズーム(ZOOM_LEVEL)は廃止のため scale は行わない
-    // ctx.scale(ZOOM_LEVEL, ZOOM_LEVEL); 
     ctx.translate(-Math.floor(camera.x), -Math.floor(camera.y));
 
-    drawLayer(0); // BG
-    drawLayer(1); // Main
+    drawLayer(0);
+    drawLayer(1);
 
     for (const e of enemies) {
         drawTile(e.x, e.y, { id: e.tileId, rot: e.rot, fx: e.fx, fy: e.fy });
@@ -561,13 +585,13 @@ function draw() {
     }
     drawPlayer();
 
-    drawLayer(2); // FG
-    
+    drawLayer(2);
+
     ctx.restore();
 }
 
 function drawLayer(layerIndex) {
-    if(!mapData[layerIndex]) return;
+    if (!mapData[layerIndex]) return;
     const layer = mapData[layerIndex];
     for (let y = 0; y < mapRows; y++) {
         for (let x = 0; x < mapCols; x++) {
@@ -581,7 +605,7 @@ function drawLayer(layerIndex) {
 
 function drawPlayer() {
     let frame = { x: 0, y: 0, w: TILE_SIZE, h: TILE_SIZE };
-    
+
     if (animData[player.state] && animData[player.state].frames.length > 0) {
         const anim = animData[player.state];
         frame = anim.frames[player.frameIndex % anim.frames.length];
@@ -591,7 +615,7 @@ function drawPlayer() {
     }
 
     ctx.save();
-    ctx.translate(player.x + player.width/2, player.y + player.height/2);
+    ctx.translate(player.x + player.width / 2, player.y + player.height / 2);
     if (!player.facingRight) ctx.scale(-1, 1);
 
     const srcImg = charImage.complete ? charImage : tilesetImage;
@@ -609,14 +633,14 @@ function drawTile(px, py, cell) {
 
     const cx = px + TILE_SIZE / 2;
     const cy = py + TILE_SIZE / 2;
-    
+
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(cell.rot * Math.PI / 180);
     const scaleX = cell.fx ? -1 : 1;
     const scaleY = cell.fy ? -1 : 1;
     ctx.scale(scaleX, scaleY);
-    
+
     if (tilesetImage.complete && tilesetImage.width > 0) {
         const cols = Math.floor(tilesetImage.width / TILE_SIZE);
         const srcX = (cell.id % cols) * TILE_SIZE;
@@ -629,8 +653,8 @@ function drawTile(px, py, cell) {
         );
     } else {
         ctx.fillStyle = '#888';
-        ctx.fillRect(-TILE_SIZE/2, -TILE_SIZE/2, TILE_SIZE, TILE_SIZE);
+        ctx.fillRect(-TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE);
     }
-    
+
     ctx.restore();
 }
