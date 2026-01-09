@@ -7,8 +7,14 @@ let mapCols = 0;
 let mapRows = 0;
 let tileDefs = {};
 
+// 定数は constants.js で定義済みのため、ここでの重複定義は削除しました
+// TILESET_SRC, CHAR_SRC, MAP_FILE_SRC, ANIM_FILE_SRC は constants.js のものを使用します
+
+const BG_SRC = 'image/BG01.jpg'; // ★追加: 背景画像のパス
+
 let tilesetImage = new Image();
 let charImage = new Image();
+let bgImage = new Image(); // ★追加: 背景画像オブジェクト
 let animData = {};
 
 const player = {
@@ -40,6 +46,7 @@ window.onload = () => {
 
     tilesetImage.src = TILESET_SRC;
     charImage.src = CHAR_SRC;
+    bgImage.src = BG_SRC; // ★追加: 背景画像のロード開始
 
     document.getElementById('file-input').addEventListener('change', manualLoadMap);
 
@@ -570,6 +577,8 @@ function draw() {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    drawBackground();
+
     ctx.save();
     ctx.translate(-Math.floor(camera.x), -Math.floor(camera.y));
 
@@ -588,6 +597,54 @@ function draw() {
     drawLayer(2);
 
     ctx.restore();
+
+    // ★追加: UI要素(HTML)の下、ゲーム画面(Canvas)の一番上にビネットを描画
+    drawVignette(); 
+}
+
+// ★追加: ビネット描画関数
+function drawVignette() {
+    const w = canvas.width;
+    const h = canvas.height;
+    
+    // 放射状グラデーションを作成
+    // 中心(w/2, h/2)、内円半径(w * 0.3)、外円半径(w * 0.8)
+    const gradient = ctx.createRadialGradient(w / 2, h / 2, w * 0.3, w / 2, h / 2, w * 0.8);
+    
+    // 透明度と色を設定
+    gradient.addColorStop(0, 'rgba(0, 0, 0, 0)'); // 中心は透明
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0.8)'); // 外側は半透明の黒
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, w, h);
+}
+
+// ★追加: 背景描画関数
+function drawBackground() {
+    if (!bgImage.complete || bgImage.width === 0) return;
+
+    // カメラ移動量の係数（小さいほど遠くにあるように見える）
+    const factor = 0.2; 
+     
+    // ★ここを修正: 直接数値を指定
+    const w = 1280; // 好きな幅
+    const h = 720; // 好きな高さ
+
+    // カメラ位置に応じたオフセット計算（画像をループさせるための剰余算）
+    // カメラが右(正)に進むと、背景は左(負)にゆっくり動く
+    let offsetX = -(camera.x * factor) % w;
+    let offsetY = -(camera.y * factor) % h;
+
+    // 画面左端などに隙間ができないよう調整
+    if (offsetX > 0) offsetX -= w;
+    if (offsetY > 0) offsetY -= h;
+
+    // 画面全体を埋めるようにタイル状に描画
+    for (let x = offsetX; x < CANVAS_WIDTH; x += w) {
+        for (let y = offsetY; y < CANVAS_HEIGHT; y += h) {
+            ctx.drawImage(bgImage, Math.floor(x), Math.floor(y), w, h);
+        }
+    }
 }
 
 function drawLayer(layerIndex) {
