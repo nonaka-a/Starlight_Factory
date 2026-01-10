@@ -27,7 +27,7 @@ body {
 #main-wrapper {
     position: relative; /* 子要素の基準点 */
     width: 1000px;  /* engine.jsのCANVAS_WIDTHに合わせる */
-    height: 500px; /* engine.jsのCANVAS_HEIGHTに合わせる */
+    height: 600px; /* engine.jsのCANVAS_HEIGHTに合わせる */
     transform-origin: center center;
     background-color: #000;
     box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);

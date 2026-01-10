@@ -1,6 +1,6 @@
 // カメラ設定
 let CANVAS_WIDTH = 1000;
-let CANVAS_HEIGHT = 500;
+let CANVAS_HEIGHT = 600;
 let ZOOM_LEVEL = 1.0;
 
 let canvas, ctx;

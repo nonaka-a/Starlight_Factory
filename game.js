@@ -17,6 +17,9 @@ let charImage = new Image();
 let bgImage = new Image(); // 背景画像オブジェクト
 let animData = {};
 
+// ★追加: リトライ用に読み込んだレベルデータを保持する変数
+let currentLevelData = null;
+
 const player = {
     x: 0, y: 0,
     vx: 0, vy: 0,
@@ -77,7 +80,10 @@ function tryAutoLoad() {
             if (!res.ok) throw new Error();
             return res.json();
         })
-        .then(data => initGameWithData(data))
+        .then(data => {
+            currentLevelData = data; // ★追加: データを保存
+            initGameWithData(data);
+        })
         .catch(() => {
             document.getElementById('screen-load').style.display = 'flex';
         });
@@ -90,6 +96,7 @@ function manualLoadMap(e) {
     reader.onload = (event) => {
         try {
             const json = JSON.parse(event.target.result);
+            currentLevelData = json; // ★追加: データを保存
             initGameWithData(json);
         } catch {
             alert("読み込み失敗");
@@ -646,6 +653,7 @@ function drawVignette() {
     ctx.fillRect(0, 0, w, h);
 }
 
+// 欠落していた描画関数群を復元
 function drawLayer(layerIndex) {
     if (!mapData[layerIndex]) return;
     const layer = mapData[layerIndex];
@@ -714,3 +722,35 @@ function drawTile(px, py, cell) {
 
     ctx.restore();
 }
+
+// ★追加: ゲームリセット関数 (グローバルスコープで呼べるように window に割り当て)
+window.resetGame = function() {
+    if (!currentLevelData) {
+        location.reload(); // データがない場合は通常リロード
+        return;
+    }
+
+    // 1. フラグのリセット
+    player.isDead = false;
+    player.isClear = false;
+    player.vx = 0;
+    player.vy = 0;
+    player.cooldown = 0;
+    player.state = "idle";
+    player.dropTimer = 0;
+    
+    isGameRunning = false; // 一旦停止
+    
+    // 2. UIを隠す
+    document.getElementById('screen-gameover').style.display = 'none';
+    document.getElementById('screen-clear').style.display = 'none';
+    
+    // 3. マップとオブジェクトの再初期化
+    // initGameWithDataを呼ぶと mapDataの再生成と setupGame -> scanMapAndSetupObjects が走る
+    initGameWithData(currentLevelData);
+
+    // 4. BGM再開 (止まっていた場合)
+    if(typeof AudioSys !== 'undefined' && AudioSys.bgmBuffer && !isMuted) {
+        AudioSys.playBGM(0.3);
+    }
+};
