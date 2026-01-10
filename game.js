@@ -20,6 +20,9 @@ let animData = {};
 // ★追加: リトライ用に読み込んだレベルデータを保持する変数
 let currentLevelData = null;
 
+// ★追加: ゲームループのID管理用（倍速バグ防止）
+let gameLoopId = null;
+
 const player = {
     x: 0, y: 0,
     vx: 0, vy: 0,
@@ -158,7 +161,18 @@ function normalizeLayer(data, w, h) {
         const row = [];
         for (let x = 0; x < w; x++) {
             let cell = data[y][x];
-            if (typeof cell === 'number') cell = { id: cell, rot: 0, fx: false, fy: false };
+            // ★修正: 元データを変更しないよう、必ず新しいオブジェクトとしてコピーする
+            if (typeof cell === 'number') {
+                cell = { id: cell, rot: 0, fx: false, fy: false };
+            } else {
+                // 既存オブジェクトの場合もコピーを作成して参照を切る
+                cell = { 
+                    id: cell.id, 
+                    rot: cell.rot || 0, 
+                    fx: cell.fx || false, 
+                    fy: cell.fy || false 
+                };
+            }
             row.push(cell);
         }
         layer.push(row);
@@ -202,7 +216,10 @@ function setupGame() {
     scanMapAndSetupObjects();
 
     isGameRunning = true;
-    requestAnimationFrame(gameLoop);
+    
+    // ★修正: 既存のループがあればキャンセルして二重起動を防止
+    if (gameLoopId) cancelAnimationFrame(gameLoopId);
+    gameLoopId = requestAnimationFrame(gameLoop);
 }
 
 function scanMapAndSetupObjects() {
@@ -215,7 +232,7 @@ function scanMapAndSetupObjects() {
             if (prop.type === 'start' || cell.id === 118) {
                 player.x = x * TILE_SIZE + (TILE_SIZE - player.width) / 2;
                 player.y = y * TILE_SIZE;
-                cell.id = 0;
+                cell.id = 0; // マップ上からスタート地点タイルを消す
             }
             else if (prop.type === 'enemy') {
                 enemies.push({
@@ -231,7 +248,7 @@ function scanMapAndSetupObjects() {
                     fx: cell.fx,
                     fy: cell.fy
                 });
-                cell.id = 0;
+                cell.id = 0; // マップ上から敵タイルを消す
             }
         }
     }
@@ -243,7 +260,8 @@ function gameLoop() {
     update();
     updateCamera(); // engine.js または game.js 内で定義が必要
     draw();
-    requestAnimationFrame(gameLoop);
+    // ★修正: ループIDを保存
+    gameLoopId = requestAnimationFrame(gameLoop);
 }
 
 // engine.js から呼ばれる、または engine.js で定義したものを上書きする形で定義
