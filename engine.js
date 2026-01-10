@@ -116,11 +116,15 @@ function toggleMute() {
 
 function fitWindow() {
     const wrapper = document.getElementById('main-wrapper');
-    const totalHeight = CANVAS_HEIGHT + 160; 
+    // UIパネル分の高さ加算(+160)を削除し、純粋にCanvasサイズで計算
+    const totalHeight = CANVAS_HEIGHT; 
     const totalWidth = CANVAS_WIDTH;
-    const scaleX = (window.innerWidth - 20) / totalWidth;
-    const scaleY = (window.innerHeight - 20) / totalHeight;
-    const scale = Math.min(scaleX, scaleY, 1);
+    
+    // ウィンドウサイズに合わせてスケール計算
+    const scaleX = window.innerWidth / totalWidth;
+    const scaleY = window.innerHeight / totalHeight;
+    const scale = Math.min(scaleX, scaleY); // 画面に収まる最大サイズ
+    
     wrapper.style.transform = `scale(${scale})`;
 }
 
