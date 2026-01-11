@@ -2,9 +2,9 @@
   "version": "4.0",
   "name": "atelier_stage1",
   "width": 19,
-  "height": 14,
+  "height": 13,
   "tileSize": 64,
-  "tilesetImage": "image/Atelier_tileset.png",
+  "tilesetImage": "image/forest_tileset.png",
   "layers": [
     {
       "name": "background",
@@ -645,9 +645,9 @@
             "fy": false
           },
           {
-            "id": 23,
+            "id": 14,
             "rot": 0,
-            "fx": true,
+            "fx": false,
             "fy": false
           },
           {
@@ -713,122 +713,6 @@
             "fy": false
           },
           {
-            "id": 15,
-            "rot": 0,
-            "fx": true,
-            "fy": false
-          },
-          {
-            "id": 15,
-            "rot": 90,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 14,
-            "rot": 0,
-            "fx": true,
-            "fy": false
-          },
-          {
-            "id": 14,
-            "rot": 0,
-            "fx": true,
-            "fy": false
-          },
-          {
-            "id": 15,
-            "rot": 90,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 15,
-            "rot": 90,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 22,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 15,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 15,
-            "rot": 0,
-            "fx": true,
-            "fy": true
-          },
-          {
-            "id": 15,
-            "rot": 0,
-            "fx": true,
-            "fy": true
-          },
-          {
-            "id": 14,
-            "rot": 0,
-            "fx": true,
-            "fy": false
-          },
-          {
-            "id": 15,
-            "rot": 90,
-            "fx": true,
-            "fy": false
-          },
-          {
-            "id": 15,
-            "rot": 90,
-            "fx": true,
-            "fy": false
-          },
-          {
-            "id": 15,
-            "rot": 0,
-            "fx": false,
-            "fy": true
-          },
-          {
-            "id": 15,
-            "rot": 0,
-            "fx": false,
-            "fy": true
-          },
-          {
-            "id": 15,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 15,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          }
-        ],
-        [
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
             "id": 14,
             "rot": 180,
             "fx": true,
@@ -841,9 +725,9 @@
             "fy": true
           },
           {
-            "id": 15,
+            "id": 64,
             "rot": 0,
-            "fx": true,
+            "fx": false,
             "fy": false
           },
           {
@@ -853,8 +737,8 @@
             "fy": false
           },
           {
-            "id": 15,
-            "rot": 90,
+            "id": 64,
+            "rot": 0,
             "fx": false,
             "fy": false
           },
@@ -865,14 +749,14 @@
             "fy": false
           },
           {
-            "id": 14,
+            "id": 15,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 22,
-            "rot": 0,
+            "id": 14,
+            "rot": 270,
             "fx": false,
             "fy": false
           },
@@ -883,10 +767,10 @@
             "fy": true
           },
           {
-            "id": 15,
+            "id": 64,
             "rot": 0,
-            "fx": true,
-            "fy": true
+            "fx": false,
+            "fy": false
           },
           {
             "id": 14,
@@ -895,9 +779,9 @@
             "fy": false
           },
           {
-            "id": 14,
-            "rot": 90,
-            "fx": true,
+            "id": 64,
+            "rot": 0,
+            "fx": false,
             "fy": false
           },
           {
@@ -957,9 +841,9 @@
             "fy": true
           },
           {
-            "id": 23,
+            "id": 14,
             "rot": 0,
-            "fx": true,
+            "fx": false,
             "fy": false
           },
           {
@@ -2360,6 +2244,30 @@
             "fy": false
           },
           {
+            "id": 18,
+            "rot": 0,
+            "fx": false,
+            "fy": false
+          },
+          {
+            "id": 0,
+            "rot": 0,
+            "fx": false,
+            "fy": false
+          },
+          {
+            "id": 0,
+            "rot": 0,
+            "fx": false,
+            "fy": false
+          },
+          {
+            "id": 18,
+            "rot": 0,
+            "fx": false,
+            "fy": false
+          },
+          {
             "id": 0,
             "rot": 0,
             "fx": false,
@@ -2391,42 +2299,6 @@
           },
           {
             "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 24,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 24,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -2438,117 +2310,13 @@
             "fy": false
           },
           {
-            "id": 9,
+            "id": 5,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 10,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          }
-        ],
-        [
-          {
-            "id": 10,
-            "rot": 0,
-            "fx": true,
-            "fy": false
-          },
-          {
-            "id": 9,
-            "rot": 0,
-            "fx": true,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": true,
-            "fy": false
-          },
-          {
-            "id": 64,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 18,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 18,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 64,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 64,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 86,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
+            "id": 5,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -3267,122 +3035,6 @@
     {
       "name": "foreground",
       "data": [
-        [
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          },
-          {
-            "id": 0,
-            "rot": 0,
-            "fx": false,
-            "fy": false
-          }
-        ],
         [
           {
             "id": 0,
