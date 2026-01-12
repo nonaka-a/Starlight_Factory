@@ -4,10 +4,20 @@
 const CraftMixing = {
     // UI
     ui: {
-        btnUp: { x: 650, y: 280, w: 60, h: 60 },
-        btnDown: { x: 290, y: 280, w: 60, h: 60 },
-        btnStartPour: { x: 380, y: 400, w: 240, h: 60, text: "つくる！" }
+        digitSlots: [
+            { id: 0, x: 380, y: 260, w: 70, h: 100 }, // 百の位
+            { id: 1, x: 465, y: 260, w: 70, h: 100 }, // 十の位
+            { id: 2, x: 550, y: 260, w: 70, h: 100 }  // 一の位
+        ],
+        btnStartPour: { x: 380, y: 390, w: 240, h: 60, text: "つくる！" }
     },
+
+    // Data
+    digitValues: [0, 0, 0], // 百, 十, 一
+    digitOffsets: [0, 0, 0], // スクロール演出用
+    dragDigit: -1,
+    dragStartY: 0,
+    itemHeight: 100,
 
     // Data
     baseX: 500,
@@ -16,35 +26,92 @@ const CraftMixing = {
     dragDistance: 0,
     blobPoints: [],
     pourWaitTimer: 0,
+    lastMx: 0, // マウス速度計算用
+    lastMy: 0,
+
+    // ゲーム進行管理用
+    timeLeft: 10.0,
+    isMixingStarted: false, // 「スタート！」演出が終わって操作可能になったか
+    startAnimTimer: 0,      // 「スタート！」演出用タイマー
+    isTimeUp: false,
 
     // --- State: Select ---
-    updateSelect: function() {
+    updateSelect: function () {
+        const cm = CraftManager;
+        const mx = Input.x - cm.camera.x;
+        const my = Input.y;
+
+        // 初期化: 初回のみ craftAmount から桁を同期
+        if (this.dragDigit === -1 && !Input.isDown) {
+            const val = cm.craftAmount;
+            this.digitValues[0] = Math.floor(val / 100) % 10;
+            this.digitValues[1] = Math.floor(val / 10) % 10;
+            this.digitValues[2] = val % 10;
+        }
+
         if (Input.isJustPressed) {
-            if (CraftManager.hitTest(this.ui.btnUp)) {
-                if (CraftManager.craftAmount < CraftManager.maxCraftAmount) {
-                    CraftManager.craftAmount++;
-                    AudioSys.playTone(600, 'sine', 0.1);
+            // digitSlots の当たり判定
+            for (let i = 0; i < this.ui.digitSlots.length; i++) {
+                const s = this.ui.digitSlots[i];
+                if (mx >= s.x && mx <= s.x + s.w && my >= s.y && my <= s.y + s.h) {
+                    this.dragDigit = i;
+                    this.dragStartY = my;
+                    break;
                 }
             }
-            else if (CraftManager.hitTest(this.ui.btnDown)) {
-                if (CraftManager.craftAmount > 1) {
-                    CraftManager.craftAmount--;
-                    AudioSys.playTone(500, 'sine', 0.1);
+
+            if (cm.hitTest(this.ui.btnStartPour)) {
+                if (cm.craftAmount > 0) {
+                    if (typeof consumeCraftMaterials === 'function') {
+                        consumeCraftMaterials(cm.craftAmount);
+                    }
+                    this.initPouring();
+                    cm.state = 'pouring';
+                    AudioSys.playTone(800, 'square', 0.1);
+                } else {
+                    AudioSys.playTone(200, 'sawtooth', 0.2);
                 }
             }
-            else if (CraftManager.hitTest(this.ui.btnStartPour)) {
-                if (typeof consumeCraftMaterials === 'function') {
-                    consumeCraftMaterials(CraftManager.craftAmount);
+        }
+
+        if (Input.isDown && this.dragDigit !== -1) {
+            const dy = my - this.dragStartY;
+            this.digitOffsets[this.dragDigit] = dy;
+
+            // 一定距離移動したら数値を変更
+            if (Math.abs(dy) > this.itemHeight * 0.5) {
+                const dir = dy > 0 ? -1 : 1;
+                this.digitValues[this.dragDigit] = (this.digitValues[this.dragDigit] + dir + 10) % 10;
+                this.dragStartY = my;
+                this.digitOffsets[this.dragDigit] = 0;
+                AudioSys.playTone(400 + (2 - this.dragDigit) * 100, 'sine', 0.05);
+
+                // 全体の数値を更新
+                cm.craftAmount = this.digitValues[0] * 100 + this.digitValues[1] * 10 + this.digitValues[2];
+                // 最大数制限
+                if (cm.craftAmount > cm.maxCraftAmount) {
+                    cm.craftAmount = cm.maxCraftAmount;
+                    this.digitValues[0] = Math.floor(cm.craftAmount / 100) % 10;
+                    this.digitValues[1] = Math.floor(cm.craftAmount / 10) % 10;
+                    this.digitValues[2] = cm.craftAmount % 10;
                 }
-                this.initPouring();
-                CraftManager.state = 'pouring';
-                AudioSys.playTone(800, 'square', 0.1);
+                // 最小数制限 (0にしておくが、開始時に弾く)
+            }
+        } else {
+            // ドラッグ終了、オフセットを戻す
+            if (this.dragDigit !== -1) {
+                this.digitOffsets[this.dragDigit] *= 0.5;
+                if (Math.abs(this.digitOffsets[this.dragDigit]) < 1) {
+                    this.digitOffsets[this.dragDigit] = 0;
+                    this.dragDigit = -1;
+                }
             }
         }
     },
 
-    drawSelect: function(offsetX) {
-        const ctx = CraftManager.ctx;
+    drawSelect: function (offsetX) {
+        const cm = CraftManager;
+        const ctx = cm.ctx;
         const cx = offsetX + 500;
         const cy = 300;
 
@@ -52,65 +119,96 @@ const CraftMixing = {
         ctx.shadowColor = "rgba(0, 0, 0, 0.2)";
         ctx.shadowBlur = 20;
         ctx.shadowOffsetY = 15;
-        
+
         ctx.fillStyle = '#fff';
         ctx.beginPath();
-        const w = 600, h = 350;
-        ctx.roundRect(cx - w/2, cy - h/2, w, h, 20);
+        const w = 600, h = 380;
+        ctx.roundRect(cx - w / 2, cy - h / 2 - 20, w, h, 20);
         ctx.fill();
-        
+
         ctx.shadowColor = "transparent";
         ctx.shadowBlur = 0;
         ctx.strokeStyle = '#ddd';
         ctx.lineWidth = 4;
-        ctx.stroke(); 
+        ctx.stroke();
 
         ctx.fillStyle = '#ff6b6b';
         ctx.font = "bold 32px 'M PLUS Rounded 1c', sans-serif";
         ctx.textAlign = 'center';
-        ctx.fillText("ほしのもとを いれる", cx, cy - 100);
+        ctx.fillText("ほし づくり", cx, cy - 110);
 
         ctx.fillStyle = '#555';
         ctx.font = "bold 18px 'M PLUS Rounded 1c', sans-serif";
-        ctx.fillText("いくつ つくる？", cx, cy - 60);
+        ctx.fillText("ほしをいくつつくる？", cx, cy - 75);
 
-        ctx.fillStyle = '#f9f9f9';
-        ctx.beginPath();
-        ctx.roundRect(cx - 100, cy - 40, 200, 100, 10);
-        ctx.fill();
-        
-        ctx.fillStyle = '#333';
-        ctx.font = "bold 64px 'M PLUS Rounded 1c', sans-serif";
-        ctx.fillText(CraftManager.craftAmount, cx, cy + 30);
-        
-        ctx.fillStyle = '#888';
-        ctx.font = "16px 'M PLUS Rounded 1c', sans-serif";
-        ctx.fillText(`(消費: ${CraftManager.craftAmount * 5}個)`, cx, cy + 50);
+        // 3桁のスロット
+        for (let i = 0; i < 3; i++) {
+            const slot = this.ui.digitSlots[i];
+            const sx = offsetX + slot.x;
+            const sy = slot.y;
+
+            // スロット背景
+            ctx.fillStyle = '#f0f0f0';
+            ctx.beginPath();
+            ctx.roundRect(sx, sy, slot.w, slot.h, 10);
+            ctx.fill();
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 数字のクリッピング表示
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(sx, sy, slot.w, slot.h);
+            ctx.clip();
+
+            const val = this.digitValues[i];
+            const offY = this.digitOffsets[i];
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            // 現在, 上, 下 の数字を描画
+            const spacing = 52;
+            for (let d = -2; d <= 2; d++) {
+                const drawVal = (val + d + 10) % 10;
+                const dist = Math.abs(d + offY / spacing);
+                ctx.globalAlpha = Math.max(0, 1.0 - dist * 0.85);
+                const fontSize = Math.max(20, 64 - dist * 25);
+                ctx.fillStyle = '#333';
+                ctx.font = `bold ${fontSize}px 'M PLUS Rounded 1c', sans-serif`;
+                ctx.fillText(drawVal, sx + slot.w / 2, sy + slot.h / 2 + (d * spacing) + offY);
+            }
+            ctx.restore();
+        }
 
         ctx.restore();
 
-        CraftManager.drawTriangleBtn(this.ui.btnUp, true);
-        CraftManager.drawTriangleBtn(this.ui.btnDown, false);
-        CraftManager.drawBtn(this.ui.btnStartPour, '#4ecdc4');
+        // つくる！ボタン
+        const btn = { ...this.ui.btnStartPour, x: offsetX + this.ui.btnStartPour.x };
+        cm.drawBtn(btn);
     },
 
     // --- State: Pouring ---
-    initPouring: function() {
+    initPouring: function () {
         const cm = CraftManager;
         cm.currentStar.particles = [];
         const totalParticles = cm.craftAmount * 5;
-        
+
         for (let i = 0; i < totalParticles; i++) {
             const angle = Math.random() * Math.PI * 2;
             const r = Math.sqrt(Math.random()) * (this.bowlRadius - 20);
-            const tx = this.baseX + Math.cos(angle) * r;
-            const ty = this.baseY + Math.sin(angle) * r;
+
+            const groundX = this.baseX + Math.cos(angle) * r;
+            const groundY = this.baseY + Math.sin(angle) * r;
+
+            const dropHeight = 300 + Math.random() * 200;
 
             cm.currentStar.particles.push({
-                x: tx,
-                y: -100 - Math.random() * 300,
-                targetY: ty,
-                targetX: tx, 
+                x: groundX,
+                y: groundY - dropHeight,
+                groundX: groundX, // 目標X
+                groundY: groundY, // 目標Y
                 vx: 0,
                 vy: 0,
                 r: 8 + Math.random() * 4,
@@ -119,23 +217,32 @@ const CraftMixing = {
                 settled: false
             });
         }
-        
+
         this.blobPoints = [];
         for (let i = 0; i < 8; i++) {
             this.blobPoints.push({
                 angle: (i / 8) * Math.PI * 2,
-                r: 10, 
-                targetR: 120
+                r: 60,
+                targetR: 145
             });
         }
         this.pourWaitTimer = 0;
         this.dragDistance = 0;
+
+        this.lastMx = Input.x - CraftManager.camera.x;
+        this.lastMy = Input.y;
+
+        // 混ぜフェーズの初期化
+        this.timeLeft = 10.0;
+        this.isMixingStarted = false;
+        this.isTimeUp = false;
+        this.startAnimTimer = 0;
     },
 
-    updatePouring: function() {
+    updatePouring: function () {
         const cm = CraftManager;
         let settledCount = 0;
-        const gravity = 0.8;
+        const gravity = 0.5;
 
         for (const p of cm.currentStar.particles) {
             if (!p.isIngredient) continue;
@@ -144,10 +251,12 @@ const CraftMixing = {
                 p.vy += gravity;
                 p.y += p.vy;
 
-                if (p.y >= p.targetY) {
-                    p.y = p.targetY;
+                if (p.y >= p.groundY) {
+                    p.y = p.groundY;
+                    p.x = p.groundX;
+
                     if (Math.abs(p.vy) > 2) {
-                        p.vy *= -0.4;
+                        p.vy *= -0.3;
                         AudioSys.playNoise(0.05, 0.05);
                     } else {
                         p.vy = 0;
@@ -159,7 +268,8 @@ const CraftMixing = {
             }
         }
 
-        if (settledCount === cm.currentStar.particles.length) {
+        // 大半が止まったら次へ
+        if (settledCount >= cm.currentStar.particles.length * 0.9) {
             this.pourWaitTimer++;
             if (this.pourWaitTimer > 30) {
                 cm.state = 'mixing';
@@ -168,64 +278,135 @@ const CraftMixing = {
     },
 
     // --- State: Mixing ---
-    updateMix: function() {
+    updateMix: function () {
         const cm = CraftManager;
-        if (cm.currentStar.mixProgress >= 100) {
+
+        // スタート演出管理
+        if (!this.isMixingStarted) {
+            this.startAnimTimer++;
+            if (this.startAnimTimer > 60) {
+                this.isMixingStarted = true;
+            }
+            this.lastMx = Input.x - cm.camera.x;
+            this.lastMy = Input.y;
+            return;
+        }
+
+        // 終了判定（時間切れのみ）
+        if (this.isTimeUp) {
             cm.ui.btnNext.visible = true;
             return;
         }
 
+        // カウントダウン
+        this.timeLeft -= 1 / 60;
+        if (this.timeLeft <= 0) {
+            this.timeLeft = 0;
+            this.isTimeUp = true;
+            AudioSys.playTone(600, 'sawtooth', 0.5); // 終了音
+        }
+
         const mx = Input.x - cm.camera.x;
         const my = Input.y;
-        
+
+        const mvx = mx - this.lastMx;
+        const mvy = my - this.lastMy;
+        this.lastMx = mx;
+        this.lastMy = my;
+
         if (Input.isDown) {
             const dx = mx - this.baseX;
             const dy = my - this.baseY;
-            const dist = Math.sqrt(dx*dx + dy*dy);
-            
-            if (dist < this.bowlRadius) {
-                this.dragDistance += 1.5;
-                cm.currentStar.mixProgress = Math.min(100, this.dragDistance / 5);
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < this.bowlRadius + 50) {
+                const moveDist = Math.sqrt(mvx * mvx + mvy * mvy);
+                this.dragDistance += moveDist;
+                // ★進捗は加算するが、100でストップせず継続可能に見せる
+                // (内部値は100で止めるが、UI表示や演出は続く)
+                if (cm.currentStar.mixProgress < 100) {
+                    cm.currentStar.mixProgress = Math.min(100, this.dragDistance / 150);
+                }
 
                 for (const p of cm.currentStar.particles) {
                     if (!p.isIngredient) continue;
                     const pdx = mx - p.x;
                     const pdy = my - p.y;
-                    const pdist = Math.sqrt(pdx*pdx + pdy*pdy);
-                    if (pdist < 60) {
-                        p.x += (Math.random()-0.5) * 5;
-                        p.y += (Math.random()-0.5) * 5;
+                    const pdist = Math.sqrt(pdx * pdx + pdy * pdy);
+
+                    if (pdist < 80) {
+                        const power = 1.0 - (pdist / 80);
+                        p.vx += mvx * power * 0.5 + (Math.random() - 0.5) * 2;
+                        p.vy += mvy * power * 0.5 + (Math.random() - 0.5) * 2;
                     }
                 }
             }
         }
 
-        const progress = cm.currentStar.mixProgress / 100;
-
+        // 物理演算
         for (const p of cm.currentStar.particles) {
             if (!p.isIngredient) continue;
-            if (progress > 0.2) {
-                const cx = this.baseX;
-                const cy = this.baseY;
-                const dx = cx - p.x;
-                const dy = cy - p.y;
-                p.x += dx * 0.05 * progress + (Math.random()-0.5);
-                p.y += dy * 0.05 * progress + (Math.random()-0.5);
+
+            p.vx *= 0.9;
+            p.vy *= 0.9;
+            p.x += p.vx;
+            p.y += p.vy;
+
+            // ボウル壁判定
+            const bdx = p.x - this.baseX;
+            const bdy = p.y - this.baseY;
+            const dist = Math.sqrt(bdx * bdx + bdy * bdy);
+            const limitR = this.bowlRadius - 15;
+
+            if (dist > limitR) {
+                const angle = Math.atan2(bdy, bdx);
+                p.x = this.baseX + Math.cos(angle) * limitR;
+                p.y = this.baseY + Math.sin(angle) * limitR;
+                p.vx *= -0.5;
+                p.vy *= -0.5;
             }
         }
 
+        const progress = cm.currentStar.mixProgress / 100;
         if (progress > 0) {
+            // ドラッグ中かつ時間切れなどでない時のみ揺らす
+            const isActiveMixing = Input.isDown && this.isMixingStarted && !this.isTimeUp;
             for (const pt of this.blobPoints) {
-                const wave = Math.sin(Date.now() / 150 + pt.angle * 3) * 5;
+                const wave = isActiveMixing ? Math.sin(Date.now() / 150 + pt.angle * 3) * 5 : 0;
                 pt.currentR = pt.r + (pt.targetR - pt.r) * progress + wave;
             }
         }
     },
 
-    drawMixArea: function(offsetX) {
+    drawMixArea: function (offsetX) {
         const ctx = CraftManager.ctx;
         const cx = offsetX + this.baseX;
         const cy = this.baseY;
+
+        // --- 画面上部 タイトル (デザイン強化) ---
+        if (CraftManager.state === 'mixing') {
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = "900 48px 'M PLUS Rounded 1c', sans-serif";
+
+            // 影
+            ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+            ctx.shadowBlur = 10;
+            ctx.shadowOffsetY = 4;
+
+            // 白枠
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 8;
+            ctx.strokeText("きじづくり", cx, 60);
+
+            // 赤文字
+            ctx.shadowColor = "transparent";
+            ctx.fillStyle = '#ff6b6b';
+            ctx.fillText("きじづくり", cx, 60);
+
+            ctx.restore();
+        }
 
         ctx.fillStyle = '#5d4037';
         ctx.beginPath();
@@ -233,12 +414,12 @@ const CraftMixing = {
         ctx.fill();
 
         const progress = CraftManager.currentStar.mixProgress / 100;
-        
-        // Blob (Orange)
+
+        // Blob
         if (progress > 0.1) {
             ctx.save();
-            ctx.globalAlpha = Math.min(1, progress); 
-            ctx.fillStyle = '#FFA500'; 
+            ctx.globalAlpha = Math.min(1, progress);
+            ctx.fillStyle = '#FFA500';
             ctx.beginPath();
             const pts = this.blobPoints;
             for (let i = 0; i < pts.length; i++) {
@@ -257,9 +438,9 @@ const CraftMixing = {
         // Particles
         for (const p of CraftManager.currentStar.particles) {
             if (!p.isIngredient) continue;
-            if (progress > 0.6) ctx.globalAlpha = 1 - (progress - 0.6) * 2.5; 
-            else ctx.globalAlpha = 1.0;
-            
+            // 50%から徐々に消えていく
+            ctx.globalAlpha = progress > 0.5 ? Math.max(0, 1.0 - (progress - 0.5) * 2) : 1.0;
+
             if (ctx.globalAlpha > 0) {
                 ctx.fillStyle = p.color;
                 ctx.beginPath();
@@ -276,8 +457,124 @@ const CraftMixing = {
         ctx.arc(cx, cy, this.bowlRadius, 0, Math.PI * 2);
         ctx.stroke();
 
+
         if (CraftManager.state === 'mixing') {
-            CraftManager.drawProgressBar(offsetX + 300, 150, CraftManager.currentStar.mixProgress, 100);
+            // --- 吹き出し (さらに左へ) ---
+            this.drawCuteSpeechBubble(offsetX + 50, 480, 320, 70, "きじをしっかりまぜよう！");
+
+            // --- 残り時間ウィンドウ (枠線太く) ---
+            this.drawAtelierStyleTimer(offsetX + 850, 300, Math.ceil(this.timeLeft));
+
+            // --- スタート演出 (中央) ---
+            if (!this.isMixingStarted) {
+                ctx.save();
+                ctx.fillStyle = '#ff4500';
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 8;
+                ctx.font = "bold 80px 'M PLUS Rounded 1c', sans-serif";
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+
+                const scale = 1 + Math.sin(this.startAnimTimer * 0.2) * 0.1;
+                ctx.translate(cx, cy);
+                ctx.scale(scale, scale);
+
+                ctx.strokeText("スタート！", 0, 0);
+                ctx.fillText("スタート！", 0, 0);
+                ctx.restore();
+            }
         }
+    },
+
+    // ヘルパー: かわいい吹き出し
+    drawCuteSpeechBubble: function (x, y, w, h, text) {
+        const ctx = CraftManager.ctx;
+
+        ctx.save();
+        ctx.translate(x, y);
+
+        // 影
+        ctx.shadowColor = "rgba(0, 0, 0, 0.2)";
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 4;
+
+        // 吹き出し本体
+        ctx.fillStyle = '#fff';
+        ctx.strokeStyle = '#ff6b6b';
+        ctx.lineWidth = 5; // 太く
+
+        ctx.beginPath();
+        ctx.roundRect(0, 0, w, h, 30);
+        ctx.fill();
+
+        ctx.shadowColor = "transparent";
+        ctx.stroke();
+
+        // しっぽ (枠線を太くして描画)
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        const tailX = w * 0.7;
+        ctx.moveTo(tailX, h - 3);
+        ctx.quadraticCurveTo(tailX + 10, h + 20, tailX + 20, h - 3);
+        ctx.fill();
+
+        ctx.lineWidth = 5;
+        ctx.lineCap = 'round'; // 角を丸く
+        ctx.beginPath();
+        // しっぽのV字ライン
+        ctx.moveTo(tailX - 2, h - 1);
+        ctx.quadraticCurveTo(tailX + 10, h + 24, tailX + 22, h - 1);
+        ctx.stroke();
+
+        // テキスト
+        ctx.fillStyle = '#555';
+        ctx.font = "bold 22px 'M PLUS Rounded 1c', sans-serif";
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, w / 2, h / 2 + 2);
+
+        ctx.restore();
+    },
+
+    // ヘルパー: 工房スタイルタイマーウィンドウ
+    drawAtelierStyleTimer: function (cx, cy, time) {
+        const ctx = CraftManager.ctx;
+        const w = 120;
+        const h = 100;
+        const r = 15;
+
+        ctx.save();
+        ctx.translate(cx - w / 2, cy - h / 2);
+
+        // 影
+        ctx.fillStyle = "rgba(0,0,0,0.2)";
+        ctx.beginPath();
+        ctx.roundRect(6, 6, w, h, r);
+        ctx.fill();
+
+        // 本体
+        ctx.fillStyle = "#fff";
+        ctx.beginPath();
+        ctx.roundRect(0, 0, w, h, r);
+        ctx.fill();
+
+        // 枠線 (太く)
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = "#ffaa00";
+        ctx.stroke();
+
+        // ラベル
+        ctx.fillStyle = "#e67e22";
+        ctx.font = "bold 16px 'M PLUS Rounded 1c', sans-serif";
+        ctx.textAlign = 'center';
+        ctx.fillText("のこり", w / 2, 25);
+
+        // 時間
+        const timeColor = time <= 3 ? '#ff4500' : '#333';
+        ctx.fillStyle = timeColor;
+        ctx.font = "bold 48px 'M PLUS Rounded 1c', sans-serif";
+        ctx.fillText(time, w / 2, 65);
+
+        ctx.restore();
     }
 };

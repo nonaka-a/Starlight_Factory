@@ -27,8 +27,14 @@ const CraftManager = {
 
     // 共通UI
     ui: {
-        btnNext: { x: 400, y: 450, w: 200, h: 60, visible: false, text: "つぎへ！" }
+        btnNext: { x: 400, y: 450, w: 200, h: 60, visible: false, text: "つぎへ！" },
+        btnCancel: { x: 800, y: 480, w: 150, h: 60, text: "やめる" },
+        // 確認画面用
+        confirmYes: { x: 320, y: 350, w: 160, h: 60, text: "はい" },
+        confirmNo: { x: 520, y: 350, w: 160, h: 60, text: "いいえ" }
     },
+
+    showConfirm: false,
 
     init: function () {
         if (typeof canvas !== 'undefined') {
@@ -43,7 +49,7 @@ const CraftManager = {
         this.camera.x = 0;
         this.camera.targetX = 0;
 
-        this.maxCraftAmount = Math.max(1, Math.floor(maxMaterials / 5));
+        this.maxCraftAmount = Math.min(999, Math.max(1, Math.floor(maxMaterials / 1)));
         this.craftAmount = 1;
 
         this.currentStar = {
@@ -92,6 +98,25 @@ const CraftManager = {
     update: function () {
         this.camera.x += (this.camera.targetX - this.camera.x) * 0.1;
 
+        // 確認ダイアログ表示中
+        if (this.showConfirm) {
+            if (this.checkBtn(this.ui.confirmYes)) {
+                this.forceCancelCraft();
+                AudioSys.playTone(400, 'sine', 0.1);
+            } else if (this.checkBtn(this.ui.confirmNo)) {
+                this.showConfirm = false;
+                AudioSys.playTone(600, 'sine', 0.1);
+            }
+            return;
+        }
+
+        // 共通: やめるボタン (優先判定)
+        if (this.checkBtn(this.ui.btnCancel)) {
+            this.cancelCraft();
+            AudioSys.playTone(200, 'sine', 0.1);
+            return; // キャンセル時は他の更新をスキップ
+        }
+
         // 状態に応じて各モジュールのupdateを呼ぶ
         if (this.state === 'select') {
             if (CraftMixing && CraftMixing.updateSelect) CraftMixing.updateSelect();
@@ -132,7 +157,7 @@ const CraftManager = {
 
         // Craft 1 (Select/Pour/Mix) - Offset 0
         if (typeof CraftMixing !== 'undefined') {
-            this.drawTable(0, this.state === 'select' ? "" : "きじを まぜよう！");
+            this.drawTable(0, "");
             if (this.state === 'select') CraftMixing.drawSelect(0);
             else if (this.state === 'pouring' || this.state === 'mixing') CraftMixing.drawMixArea(0);
         }
@@ -162,8 +187,50 @@ const CraftManager = {
             this.drawBtn(this.ui.btnNext);
         }
 
+        // 共通UI: やめるボタン (赤色)
+        this.drawBtn(this.ui.btnCancel, '#ff6b6b');
+
         // 共通演出パーティクル
         this.drawCommonParticles();
+
+        // 中断確認ダイアログ
+        if (this.showConfirm) {
+            this.drawConfirmOverlay();
+        }
+    },
+
+    drawConfirmOverlay: function () {
+        const ctx = this.ctx;
+        const w = 1000, h = 600;
+
+        // 背景オーバーレイ
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillRect(0, 0, w, h);
+
+        // ダイアログボックス
+        const bw = 500, bh = 250;
+        const bx = (w - bw) / 2, by = (h - bh) / 2;
+
+        ctx.save();
+        ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+        ctx.shadowBlur = 15;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.roundRect(bx, by, bw, bh, 20);
+        ctx.fill();
+        ctx.restore();
+
+        // メッセージ
+        ctx.fillStyle = '#333';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.font = "bold 20px 'M PLUS Rounded 1c', sans-serif";
+        ctx.fillText("使ったほしのもとはなくなりますが", w / 2, by + 80);
+        ctx.fillText("よいですか？", w / 2, by + 115);
+
+        // ボタン
+        this.drawBtn(this.ui.confirmYes, '#ff6b6b'); // はい (赤)
+        this.drawBtn(this.ui.confirmNo, '#4ecdc4');  // いいえ (通常)
     },
 
     // --- 状態遷移 ---
@@ -187,13 +254,42 @@ const CraftManager = {
         }
     },
 
+    cancelCraft: function () {
+        // 素材を消費する前(select工程)なら確認なしで戻る
+        if (this.state === 'select') {
+            this.forceCancelCraft();
+            return;
+        }
+
+        // それ以外は確認を出す
+        this.showConfirm = true;
+    },
+
+    forceCancelCraft: function () {
+        this.showConfirm = false;
+        this.isActive = false;
+
+        // HUD (カウンター等) を復元
+        const ui = document.getElementById('ui-container');
+        if (ui) ui.style.display = 'block';
+
+        if (this.loopId) {
+            cancelAnimationFrame(this.loopId);
+            this.loopId = null;
+        }
+
+        if (typeof resetGameFromCraft === 'function') {
+            resetGameFromCraft(0); // 獲得星0個で戻る
+        }
+    },
+
     // --- 共通ヘルパー関数 ---
     resetNextBtn: function () {
         this.ui.btnNext.visible = false;
     },
 
     checkBtn: function (btn) {
-        if (!btn.visible) return false;
+        if (btn.visible === false) return false;
         const mx = Input.x;
         const my = Input.y;
         if (mx >= btn.x && mx <= btn.x + btn.w && my >= btn.y && my <= btn.y + btn.h) {
@@ -212,16 +308,16 @@ const CraftManager = {
         if (!btn.visible && btn.visible !== undefined) return;
         const ctx = this.ctx;
 
-        ctx.fillStyle = color || '#ff6b6b';
+        // 影を先に描画 (CSSのbox-shadowに近い見た目)
+        ctx.fillStyle = '#36b0a8';
         ctx.beginPath();
-        ctx.roundRect(btn.x, btn.y, btn.w, btn.h, 30);
+        ctx.roundRect(btn.x, btn.y + 5, btn.w, btn.h, 30);
         ctx.fill();
 
-        // 本体色の少し暗い色を影として使用（あるいは共通の半透明黒）
-        ctx.fillStyle = 'rgba(0,0,0,0.15)';
+        // 本体
+        ctx.fillStyle = color || '#4ecdc4';
         ctx.beginPath();
-        // 影も本体と同じ角丸 30 で描画
-        ctx.roundRect(btn.x, btn.y + 4, btn.w, btn.h, 30);
+        ctx.roundRect(btn.x, btn.y, btn.w, btn.h, 30);
         ctx.fill();
 
         ctx.fillStyle = '#fff';

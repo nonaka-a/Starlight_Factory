@@ -19,6 +19,7 @@ let gameLoopId = null;
 let totalItemCount = 0; // ほしのもと累計 (ステージ持ち越し分)
 let totalStarCount = 0;
 let isAtelierMode = false;
+let spawnPoint = { x: 0, y: 0 }; // ★追加: 初期位置保存用
 
 const player = {
     x: 0, y: 0,
@@ -289,6 +290,8 @@ function setupGame() {
 
 function scanMapAndSetupObjects() {
     const mainLayer = mapData[1];
+    spawnPoint = { x: 0, y: 0 }; // 初期化
+
     for (let y = 0; y < mapRows; y++) {
         for (let x = 0; x < mapCols; x++) {
             const cell = mainLayer[y][x];
@@ -297,6 +300,11 @@ function scanMapAndSetupObjects() {
             if (prop.type === 'start' || cell.id === 118) {
                 player.x = x * TILE_SIZE + (TILE_SIZE - player.width) / 2;
                 player.y = y * TILE_SIZE;
+
+                // ★追加: スタート位置を保存
+                spawnPoint.x = player.x;
+                spawnPoint.y = player.y;
+
                 cell.id = 0;
             }
             else if (prop.type === 'enemy') {
@@ -943,7 +951,7 @@ window.loadStage = function (url, isAtelier = false) {
     const locText = document.getElementById('location-name');
     if (transition && locText) {
         let name = "ほしあかりの森";
-        if (isAtelier || url.includes("atelier")) name = "工房";
+        if (isAtelier || url.includes("atelier")) name = "ほしぞら工房";
         locText.textContent = name;
         transition.style.display = 'flex';
         transition.classList.remove('fade-out');
@@ -1006,7 +1014,7 @@ window.loadStage = function (url, isAtelier = false) {
 // --- ★追加機能: クラフト開始 ---
 function startCraftMode() {
     const currentTotal = totalItemCount + score;
-    if (currentTotal < 5) {
+    if (currentTotal < 1) {
         AudioSys.playTone(200, 'sawtooth', 0.2);
         console.log("ほしのもとが足りません");
         return;
@@ -1028,7 +1036,7 @@ function startCraftMode() {
 
 // --- ★追加機能: クラフト消費 ---
 window.consumeCraftMaterials = function (setAmount) {
-    const cost = setAmount * 5;
+    const cost = setAmount * 1;
     if (score >= cost) {
         score -= cost;
     } else {
@@ -1038,6 +1046,7 @@ window.consumeCraftMaterials = function (setAmount) {
     }
     updateScoreDisplay();
 };
+
 
 // --- ★追加機能: クラフト終了時の復帰 ---
 window.resetGameFromCraft = function (starRewardAmount) {
@@ -1050,6 +1059,16 @@ window.resetGameFromCraft = function (starRewardAmount) {
     totalStarCount += starRewardAmount;
     AudioSys.playTone(1200, 'sine', 0.3);
     updateScoreDisplay();
+
+    // ★重要: 中断時(starRewardAmount === 0)などは、作業窓への即再入を防ぐため初期位置に戻す
+    if (starRewardAmount === 0) {
+        player.x = spawnPoint.x;
+        player.y = spawnPoint.y;
+        player.vx = 0;
+        player.vy = 0;
+        // 即座の誤操作防止のためクールダウンを設定
+        player.cooldown = 30;
+    }
 
     updateCamera();
 
