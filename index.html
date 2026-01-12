@@ -20,13 +20,19 @@
                 <div id="location-name">ほしあかりの森</div>
             </div>
 
-            <!-- ★ここに追加: アイテムカウンター -->
+            <!-- アイテムカウンター (ほしのもと) -->
             <div id="item-counter">
                 <span class="counter-icon">🟡</span>
                 <span id="score-text">0</span>
             </div>
 
-            <!-- ★ここに追加: HPカウンター -->
+            <!-- ★追加: 星カウンター -->
+            <div id="star-counter">
+                <span class="counter-icon">⭐</span>
+                <span id="star-text">0</span>
+            </div>
+
+            <!-- HPカウンター -->
             <div id="hp-counter">
             </div>
 
@@ -45,7 +51,6 @@
                 <div class="modal">
                     <h1>GAME OVER</h1>
                     <p>やられちゃった...</p>
-                    <!-- ★修正: onclickを変更 -->
                     <button class="retry-btn" onclick="resetGame()">🔄 もう一回！</button>
                 </div>
             </div>
@@ -64,9 +69,7 @@
 
             <!-- タッチ操作UI -->
             <div id="ui-container">
-                <!-- 左下: 十字キー -->
                 <div class="dpad">
-                    <!-- 配置用スペース -->
                     <div style="grid-column:2; grid-row:1;"></div>
                     <div id="btn-left" class="dpad-btn">←</div>
                     <div id="btn-down" class="dpad-btn">↓</div>
@@ -74,17 +77,14 @@
                 </div>
 
                 <div class="center-panel">
-                    <!-- ズームボタン削除 -->
                 </div>
 
-                <!-- 右下: アクションボタン -->
                 <div class="action-pad">
                     <div id="btn-attack" class="action-btn btn-attack">B</div>
                     <div id="btn-jump" class="action-btn btn-jump">A</div>
                 </div>
             </div>
 
-            <!-- 画面中央下の設定ボタン -->
             <div id="control-panel">
                 <div id="btn-fullscreen" class="func-btn" title="フルスクリーン">⛶</div>
                 <div id="btn-mute" class="func-btn" title="ミュート">🔊</div>
@@ -92,11 +92,18 @@
 
         </div>
 
-        <!-- キャッシュ対策 -->
         <script src="audio.js?v=4.0"></script>
         <script src="constants.js?v=4.0"></script>
-        <script src="engine.js?v=4.0"></script>
-        <script src="game.js?v=4.0"></script>
+        <script src="engine.js?v=4.1"></script>
+        
+        <!-- クラフト分割 -->
+        <script src="craft_manager.js?v=4.1"></script>
+        <script src="craft1.js?v=4.1"></script>
+        <script src="craft2.js?v=4.1"></script>
+        <script src="craft3.js?v=4.1"></script>
+        <script src="craft4.js?v=4.1"></script>
+        
+        <script src="game.js?v=4.1"></script>
 </body>
 
 </html>

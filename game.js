@@ -1,29 +1,23 @@
 /**
  * --- ゲームの状態 ---
  */
-// mapData は [BGレイヤー, Mainレイヤー, FGレイヤー] の配列
 let mapData = [];
 let mapCols = 0;
 let mapRows = 0;
 let tileDefs = {};
 
-// 定数は constants.js で定義済み
-
-const BG_SRC = 'image/BG01.jpg'; // 背景画像のパス
+const BG_SRC = 'image/BG01.jpg';
 
 let tilesetImage = new Image();
 let charImage = new Image();
-let bgImage = new Image(); // 背景画像オブジェクト
+let bgImage = new Image();
 let animData = {};
 
-// ★追加: リトライ用に読み込んだレベルデータを保持する変数
 let currentLevelData = null;
-
-// ★追加: ゲームループのID管理用（倍速バグ防止）
 let gameLoopId = null;
 
-// ★追加: アイテム持越し管理 & 工房モードフラグ
-let totalItemCount = 0;
+let totalItemCount = 0; // ほしのもと累計 (ステージ持ち越し分)
+let totalStarCount = 0;
 let isAtelierMode = false;
 
 const player = {
@@ -42,13 +36,13 @@ const player = {
     hp: 3,
     maxHp: 3,
     invincible: 0,
-    downPressTime: 0 // 長押し計測用
+    downPressTime: 0
 };
 
 let enemies = [];
 let bullets = [];
-let atelierStations = []; // ★追加: 工房内の設備(UI表示用)
-let score = 0;
+let atelierStations = [];
+let score = 0; // 現在のステージ内での「ほしのもと」取得数
 
 /**
  * --- 初期化処理 ---
@@ -61,7 +55,6 @@ window.onload = () => {
     charImage.src = CHAR_SRC;
     bgImage.src = BG_SRC;
 
-    // ★追加: 各BGMの読み込みを開始
     if (typeof AudioSys !== 'undefined' && AudioSys.loadBGM) {
         AudioSys.loadBGM('forest', FOREST_BGM_SRC);
         AudioSys.loadBGM('atelier', ATELIER_BGM_SRC);
@@ -69,9 +62,16 @@ window.onload = () => {
 
     document.getElementById('file-input').addEventListener('change', manualLoadMap);
 
-    // engine.jsで定義されている setupControls を呼ぶ
     setupControls();
     window.addEventListener('resize', fitWindow);
+
+    // デバッグ: hキーで素材増加
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'h' || e.key === 'H') {
+            totalItemCount += 5;
+            updateScoreDisplay();
+        }
+    });
 
     fetch(ANIM_FILE_SRC)
         .then(res => res.json())
@@ -86,7 +86,7 @@ window.onload = () => {
 };
 
 function tryAutoLoad() {
-    loadStage(MAP_FILE_SRC);
+    loadStage(ATELIER_MAP_SRC, true);
 }
 
 function manualLoadMap(e) {
@@ -96,7 +96,7 @@ function manualLoadMap(e) {
     reader.onload = (event) => {
         try {
             const json = JSON.parse(event.target.result);
-            currentLevelData = json; // ★追加: データを保存
+            currentLevelData = json;
             initGameWithData(json);
         } catch {
             alert("読み込み失敗");
@@ -105,16 +105,18 @@ function manualLoadMap(e) {
     reader.readAsText(file);
 }
 
-// ★追加: スコア表示更新用
 function updateScoreDisplay() {
     const st = document.getElementById('score-text');
     if (st) {
-        // 所持合計 + 今拾った数
+        // 現在所持数 = ステージ内(score) + 持ち越し(totalItemCount)
         st.textContent = totalItemCount + score;
+    }
+    const starText = document.getElementById('star-text');
+    if (starText) {
+        starText.textContent = totalStarCount;
     }
 }
 
-// ★追加: HP表示更新用
 function updateHPDisplay() {
     const hpContainer = document.getElementById('hp-counter');
     if (!hpContainer) return;
@@ -133,7 +135,7 @@ function updateHPDisplay() {
 }
 
 function initGameWithData(json) {
-    isGameRunning = false; // ★重要: マップ読み込み中はループを停止（サイズ不整合によるクラッシュ防止）
+    isGameRunning = false;
     if (gameLoopId) {
         cancelAnimationFrame(gameLoopId);
         gameLoopId = null;
@@ -149,11 +151,8 @@ function initGameWithData(json) {
         });
     }
 
-    // ★バグ修正: ID 119 (ゴール旗) がJSONでwall定義されている場合があるので強制上書き
     tileDefs[119] = { id: 119, type: 'goal', solid: false };
 
-
-    // ★追加: タイルセット画像の動的切り替え (Promise化して確実に待つ)
     return new Promise((resolve) => {
         const onReady = () => {
             finishInitGame(json);
@@ -161,18 +160,16 @@ function initGameWithData(json) {
         };
 
         if (json.tilesetImage) {
-            // 画像が同じ場合は読み込みイベントが発火しない場合があるためチェック
             if (tilesetImage.src.includes(json.tilesetImage) && tilesetImage.complete) {
                 onReady();
             } else {
                 tilesetImage.onload = onReady;
                 tilesetImage.onerror = () => {
                     console.error("Tileset image load failed:", json.tilesetImage);
-                    onReady(); // 失敗しても進める
+                    onReady();
                 };
                 tilesetImage.src = json.tilesetImage;
 
-                // iPad/Safari対策: src代入直後に complete になる場合がある
                 if (tilesetImage.complete) {
                     tilesetImage.onload = null;
                     onReady();
@@ -182,7 +179,6 @@ function initGameWithData(json) {
             onReady();
         }
 
-        // フェイルセーフ: 3秒経っても読み込めない場合は強制的に進める
         setTimeout(() => {
             if (!isGameRunning) {
                 console.warn("Loading timeout - forcing start");
@@ -231,11 +227,9 @@ function normalizeLayer(data, w, h) {
         const row = [];
         for (let x = 0; x < w; x++) {
             let cell = data[y][x];
-            // ★修正: 元データを変更しないよう、必ず新しいオブジェクトとしてコピーする
             if (typeof cell === 'number') {
                 cell = { id: cell, rot: 0, fx: false, fy: false };
             } else {
-                // 既存オブジェクトの場合もコピーを作成して参照を切る
                 cell = {
                     id: cell.id,
                     rot: cell.rot || 0,
@@ -289,7 +283,6 @@ function setupGame() {
 
     isGameRunning = true;
 
-    // ★修正: 既存のループがあればキャンセルして二重起動を防止
     if (gameLoopId) cancelAnimationFrame(gameLoopId);
     gameLoopId = requestAnimationFrame(gameLoop);
 }
@@ -304,7 +297,7 @@ function scanMapAndSetupObjects() {
             if (prop.type === 'start' || cell.id === 118) {
                 player.x = x * TILE_SIZE + (TILE_SIZE - player.width) / 2;
                 player.y = y * TILE_SIZE;
-                cell.id = 0; // マップ上からスタート地点タイルを消す
+                cell.id = 0;
             }
             else if (prop.type === 'enemy') {
                 enemies.push({
@@ -320,9 +313,8 @@ function scanMapAndSetupObjects() {
                     fx: cell.fx,
                     fy: cell.fy
                 });
-                cell.id = 0; // マップ上から敵タイルを消す
+                cell.id = 0;
             }
-            // ★追加: 工房の設備 (ID 112, 113, 114, 115)
             else if ([112, 113, 114, 115].includes(cell.id)) {
                 let text = "";
                 if (cell.id === 112) text = "さがす";
@@ -330,15 +322,14 @@ function scanMapAndSetupObjects() {
                 if (cell.id === 114) text = "うちあげる";
                 if (cell.id === 115) text = "ほしを見る";
 
-                // DOM要素作成は廃止し、データのみ保持
                 atelierStations.push({
-                    x: x * TILE_SIZE + TILE_SIZE / 2, // 中心座標
-                    y: y * TILE_SIZE + TILE_SIZE / 2, // ★修正: タイル中心に合わせる
+                    x: x * TILE_SIZE + TILE_SIZE / 2,
+                    y: y * TILE_SIZE + TILE_SIZE / 2,
                     text: text,
                     id: cell.id
                 });
 
-                cell.id = 0; // ★修正: タイルを隠す（削除する）
+                cell.id = 0;
             }
         }
     }
@@ -348,13 +339,11 @@ function scanMapAndSetupObjects() {
 function gameLoop() {
     if (!isGameRunning) return;
     update();
-    updateCamera(); // engine.js または game.js 内で定義が必要
+    updateCamera();
     draw();
-    // ★修正: ループIDを保存
     gameLoopId = requestAnimationFrame(gameLoop);
 }
 
-// engine.js から呼ばれる、または engine.js で定義したものを上書きする形で定義
 window.updateCamera = function () {
     const viewportW = CANVAS_WIDTH;
     const viewportH = CANVAS_HEIGHT;
@@ -379,8 +368,6 @@ window.updateCamera = function () {
 
     camera.x = camX;
     camera.y = camY;
-
-    // ワールドUIの位置更新(DOM版)は削除
 }
 
 function update() {
@@ -402,7 +389,6 @@ function update() {
         player.vx = 0;
     }
 
-    // 下キー長押し判定
     if (keys.ArrowDown) {
         player.downPressTime++;
 
@@ -466,7 +452,6 @@ function update() {
     checkObjectCollisionX(player);
 
     if (keys.KeyB && player.cooldown <= 0) {
-        // ★修正: 工房モードでは発射不可
         if (!isAtelierMode) {
             shootBullet();
             player.cooldown = 20;
@@ -650,18 +635,18 @@ function checkTileAt(x, y) {
         const cell = mapData[1][row][col];
         const prop = getTileProp(cell.id);
 
-        // ★追加: 工房設備のインタラクション
         if (cell.id === 112) {
-            // さがす -> マップ遷移
-            // ※連続ロードを防ぐため、フラグ管理が必要かも
             if (!player.isClear && !player.isDead) {
-                // AudioSys.seDecide(); // 決定音があれば鳴らす
                 loadStage('json/atume_stage2.json');
             }
             return;
         }
-        if (cell.id === 113 || cell.id === 114) {
-            // つくる / うちあげる -> 現状は何もしない
+        // ★修正: つくる
+        if (cell.id === 113) {
+            startCraftMode();
+            return;
+        }
+        if (cell.id === 114) {
             return;
         }
 
@@ -690,9 +675,7 @@ function checkInteraction() {
     const cy = player.y + player.height / 2;
 
     if (isAtelierMode) {
-        // 工房モード：タイル判定ではなく設備との距離判定
         for (const st of atelierStations) {
-            // プレイヤーがウィンドウの範囲（タイルの位置付近）に重なっているか判定
             if (Math.abs(cx - st.x) < TILE_SIZE && Math.abs(cy - st.y) < TILE_SIZE) {
                 if (st.id === 112) {
                     if (!player.isClear && !player.isDead) {
@@ -700,11 +683,15 @@ function checkInteraction() {
                     }
                     return;
                 }
+                // ★修正: つくる
+                if (st.id === 113) {
+                    startCraftMode();
+                    return;
+                }
             }
         }
     }
 
-    // 工房モードでも通常タイル判定（アイテム取得など）は常に行う
     checkTileAt(cx, cy);
     checkTileAt(cx, player.y + player.height - 2);
 
@@ -715,7 +702,6 @@ function checkInteraction() {
     }
 }
 
-// ★追加: ダメージ処理
 function takeDamage() {
     if (player.invincible > 0 || player.isDead || player.isClear) return;
 
@@ -725,16 +711,9 @@ function takeDamage() {
     if (player.hp <= 0) {
         showGameOver();
     } else {
-        AudioSys.playTone(200, 'square', 0.2); // ダメージ音（仮）
-        player.invincible = 60; // 約1秒の無敵時間
+        AudioSys.playTone(200, 'square', 0.2);
+        player.invincible = 60;
     }
-}
-
-function checkRectCollision(r1, r2) {
-    return r1.x < r2.x + r2.width &&
-        r1.x + r1.width > r2.x &&
-        r1.y < r2.y + r2.height &&
-        r1.y + r1.height > r2.y;
 }
 
 function showGameOver() {
@@ -742,10 +721,6 @@ function showGameOver() {
     player.isDead = true;
     AudioSys.seGameOver();
 
-    // ★追加: やられたら「今拾った分」は没収 (所持金/トータルは残すのが一般的だが、
-    // 前のタスク16では「クリアする」となっていたので、もし全部消すならここ)
-    // 今回は「森でゴールできたら所持してほしい」とのことなので、
-    // ゴールする前の分(score)だけをリセットすることにする。
     score = 0;
     updateScoreDisplay();
 
@@ -757,11 +732,9 @@ function showGameClear() {
     player.isClear = true;
     AudioSys.seClear();
 
-    // ★追加: ゴール時にアイテムを保存（持越し）
     totalItemCount += score;
-    score = 0; // 保存したのでリセット
+    score = 0;
     updateScoreDisplay();
-    console.log("Total Items:", totalItemCount);
 
     document.getElementById('screen-clear').style.display = 'flex';
 }
@@ -770,7 +743,6 @@ function draw() {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // ★追加: 背景画像のパララックス描画（最背面）
     drawBackground();
 
     ctx.save();
@@ -779,7 +751,6 @@ function draw() {
     drawLayer(0);
     drawLayer(1);
 
-    // ★追加: 工房ウィンドウを描画 (プレイヤーの後ろ)
     drawAtelierWindows();
 
     for (const e of enemies) {
@@ -795,55 +766,52 @@ function draw() {
 
     ctx.restore();
 
-    // ★追加: ビネット効果（最前面）※工房では表示しない
     if (!isAtelierMode) {
         drawVignette();
     }
 }
 
-// ★追加: 工房ウィンドウ描画 (Canvas)
 function drawAtelierWindows() {
     if (!isAtelierMode) return;
 
     ctx.save();
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.font = "bold 28px 'M PLUS Rounded 1c', sans-serif"; // フォントを大きく
+    ctx.font = "bold 28px 'M PLUS Rounded 1c', sans-serif";
 
     for (const st of atelierStations) {
         const x = st.x;
-        const y = st.y; // タイル中心に表示
+        const y = st.y;
 
-        // ウィンドウのサイズとスタイル (さらに大きく、ポップに)
         const w = 180;
         const h = 80;
-        const r = 20; // 角丸を大きくしてポップに
+        const r = 20;
 
         // 影
         ctx.fillStyle = "rgba(0,0,0,0.2)";
         ctx.beginPath();
-        ctx.roundRect(x - w / 2 + 6, y - h / 2 + 6, w, h, r);
+        const offsetX = 6;
+        const offsetY = 6;
+        ctx.roundRect(x - w / 2 + offsetX, y - h / 2 + offsetY, w, h, r);
         ctx.fill();
 
-        // 枠 (白)
+        // 窓本体
         ctx.fillStyle = "#fff";
         ctx.beginPath();
         ctx.roundRect(x - w / 2, y - h / 2, w, h, r);
         ctx.fill();
 
-        // 縁取りとテキストの色 (ID 115は紫、他はオレンジ)
         ctx.lineWidth = 6;
         if (st.id === 115) {
-            ctx.strokeStyle = "#8233ff"; // 濃いめの紫
+            ctx.strokeStyle = "#8233ff";
             ctx.stroke();
-            ctx.fillStyle = "#6622dd";   // テキスト濃い紫
+            ctx.fillStyle = "#6622dd";
         } else {
-            ctx.strokeStyle = "#ffaa00"; // オレンジ
+            ctx.strokeStyle = "#ffaa00";
             ctx.stroke();
-            ctx.fillStyle = "#e67e22";   // テキストオレンジ
+            ctx.fillStyle = "#e67e22";
         }
 
-        // テキスト
         ctx.fillText(st.text, x, y);
     }
     ctx.restore();
@@ -851,21 +819,13 @@ function drawAtelierWindows() {
 
 function drawBackground() {
     if (!bgImage.complete || bgImage.width === 0) return;
-
-    // カメラ移動量の係数（小さいほど遠くにあるように見える）
     const factor = 0.2;
-
-    // ★調整済みサイズ
     const w = 1280;
     const h = 800;
-
-    // カメラ位置に応じたオフセット計算（画像をループさせるための剰余算）
     let offsetX = -(camera.x * factor) % w;
     let offsetY = -(camera.y * factor) % h;
-
     if (offsetX > 0) offsetX -= w;
     if (offsetY > 0) offsetY -= h;
-
     for (let x = offsetX; x < CANVAS_WIDTH; x += w) {
         for (let y = offsetY; y < CANVAS_HEIGHT; y += h) {
             ctx.drawImage(bgImage, Math.floor(x), Math.floor(y), w, h);
@@ -873,21 +833,16 @@ function drawBackground() {
     }
 }
 
-// ★追加: ビネット描画関数（濃さ0.8）
 function drawVignette() {
     const w = canvas.width;
     const h = canvas.height;
-
     const gradient = ctx.createRadialGradient(w / 2, h / 2, w * 0.3, w / 2, h / 2, w * 0.8);
-
     gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    gradient.addColorStop(1, 'rgba(0, 0, 0, 0.8)'); // 濃さ0.8
-
+    gradient.addColorStop(1, 'rgba(0, 0, 0, 0.8)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, w, h);
 }
 
-// 欠落していた描画関数群を復元
 function drawLayer(layerIndex) {
     if (!mapData[layerIndex]) return;
     const layer = mapData[layerIndex];
@@ -903,7 +858,6 @@ function drawLayer(layerIndex) {
 
 function drawPlayer() {
     let frame = { x: 0, y: 0, w: TILE_SIZE, h: TILE_SIZE };
-
     if (animData[player.state] && animData[player.state].frames.length > 0) {
         const anim = animData[player.state];
         frame = anim.frames[player.frameIndex % anim.frames.length];
@@ -915,62 +869,42 @@ function drawPlayer() {
     ctx.save();
     ctx.translate(player.x + player.width / 2, player.y + player.height / 2);
     if (!player.facingRight) ctx.scale(-1, 1);
-
-    // ★追加: 無敵時間中の点滅処理
     if (player.invincible > 0 && Math.floor(Date.now() / 100) % 2 === 0) {
         ctx.globalAlpha = 0.5;
     }
-
     const srcImg = charImage.complete ? charImage : tilesetImage;
-    ctx.drawImage(
-        srcImg,
-        frame.x, frame.y, frame.w, frame.h,
-        -frame.w / 2, -frame.h / 2, frame.w, frame.h
-    );
-
+    ctx.drawImage(srcImg, frame.x, frame.y, frame.w, frame.h, -frame.w / 2, -frame.h / 2, frame.w, frame.h);
     ctx.restore();
     ctx.globalAlpha = 1.0;
 }
 
 function drawTile(px, py, cell) {
     if (cell.id === 0) return;
-
     const cx = px + TILE_SIZE / 2;
     const cy = py + TILE_SIZE / 2;
-
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(cell.rot * Math.PI / 180);
     const scaleX = cell.fx ? -1 : 1;
     const scaleY = cell.fy ? -1 : 1;
     ctx.scale(scaleX, scaleY);
-
     if (tilesetImage.complete && tilesetImage.width > 0) {
         const cols = Math.floor(tilesetImage.width / TILE_SIZE);
         const srcX = (cell.id % cols) * TILE_SIZE;
         const srcY = Math.floor(cell.id / cols) * TILE_SIZE;
-
-        ctx.drawImage(
-            tilesetImage,
-            srcX, srcY, TILE_SIZE, TILE_SIZE,
-            -TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE
-        );
+        ctx.drawImage(tilesetImage, srcX, srcY, TILE_SIZE, TILE_SIZE, -TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE);
     } else {
         ctx.fillStyle = '#888';
         ctx.fillRect(-TILE_SIZE / 2, -TILE_SIZE / 2, TILE_SIZE, TILE_SIZE);
     }
-
     ctx.restore();
 }
 
-// ★追加: ゲームリセット関数 (グローバルスコープで呼べるように window に割り当て)
 window.resetGame = function () {
     if (!currentLevelData) {
-        location.reload(); // データがない場合は通常リロード
+        location.reload();
         return;
     }
-
-    // 1. フラグのリセット
     player.isDead = false;
     player.isClear = false;
     player.vx = 0;
@@ -981,67 +915,50 @@ window.resetGame = function () {
     player.hp = player.maxHp;
     player.invincible = 0;
 
-    isGameRunning = false; // 一旦停止
-
-    // 2. UIを隠す
+    isGameRunning = false;
     document.getElementById('screen-gameover').style.display = 'none';
     document.getElementById('screen-clear').style.display = 'none';
     updateHPDisplay();
 
-    // 3. マップとオブジェクトの再初期化
-    // initGameWithDataを呼ぶと mapDataの再生成と setupGame -> scanMapAndSetupObjects が走る
     initGameWithData(currentLevelData);
 
-    // 4. BGM再開 (止まっていた場合)
     if (typeof AudioSys !== 'undefined' && !AudioSys.isMuted) {
         const bgmName = isAtelierMode ? 'atelier' : 'forest';
         AudioSys.playBGM(bgmName, 0.3);
     }
 };
 
-// ★追加: 工房へ移動する関数
 window.goToAtelier = function () {
     document.getElementById('screen-clear').style.display = 'none';
     loadStage(ATELIER_MAP_SRC, true);
 };
 
-// ★追加: 汎用ステージ読み込み処理
 window.loadStage = function (url, isAtelier = false) {
-    // 既存UIのクリア
     const layer = document.getElementById('world-ui-layer');
     if (layer) layer.innerHTML = '';
     atelierStations = [];
 
-    // ステージ遷移演出の開始時刻
     const startTime = Date.now();
     const transition = document.getElementById('screen-transition');
     const locText = document.getElementById('location-name');
     if (transition && locText) {
-        // 場所名の設定
         let name = "ほしあかりの森";
         if (isAtelier || url.includes("atelier")) name = "工房";
         locText.textContent = name;
-
-        // まずコンテナを表示状態にする
         transition.style.display = 'flex';
         transition.classList.remove('fade-out');
         transition.style.opacity = '1';
-
-        // 1フレーム待ってからアニメーションを開始させる（Safari対策）
         requestAnimationFrame(() => {
             locText.classList.remove('fade-in-text');
-            void locText.offsetWidth; // 強制リフロー
+            void locText.offsetWidth;
             locText.classList.add('fade-in-text');
         });
     }
 
-    // 次のステージへ行く前に現在のスコアをトータルに加算（工房での取得分などの保存）
     totalItemCount += score;
     score = 0;
-
     isAtelierMode = isAtelier;
 
-    // BGMの切り替え
     if (typeof AudioSys !== 'undefined' && !AudioSys.isMuted) {
         const bgmName = isAtelier ? 'atelier' : 'forest';
         AudioSys.playBGM(bgmName, 0.3);
@@ -1054,11 +971,7 @@ window.loadStage = function (url, isAtelier = false) {
         })
         .then(async data => {
             currentLevelData = data;
-
-            // 重要: 画像の読み込み完了を確実に待機する
             await initGameWithData(data);
-
-            // フラグ等のリセット (initGameの後に行う)
             player.isDead = false;
             player.isClear = false;
             player.vx = 0;
@@ -1068,13 +981,10 @@ window.loadStage = function (url, isAtelier = false) {
             player.dropTimer = 0;
             player.hp = player.maxHp;
             player.invincible = 0;
-
-            // 今のステージの取得数をリセット
             score = 0;
             updateHPDisplay();
             updateScoreDisplay();
 
-            // 遷移中の演出時間を考慮して暗転解除 (最低でも一定時間は表示を維持)
             const remainingTime = Math.max(500, 2200 - (Date.now() - startTime));
             setTimeout(() => {
                 if (transition) {
@@ -1091,4 +1001,58 @@ window.loadStage = function (url, isAtelier = false) {
             alert("ステージデータが見つかりませんでした: " + url);
             if (transition) transition.style.display = 'none';
         });
+};
+
+// --- ★追加機能: クラフト開始 ---
+function startCraftMode() {
+    const currentTotal = totalItemCount + score;
+    if (currentTotal < 5) {
+        AudioSys.playTone(200, 'sawtooth', 0.2);
+        console.log("ほしのもとが足りません");
+        return;
+    }
+
+    // クラフトマネージャ起動 (この時点では消費しない)
+    isGameRunning = false;
+    if (gameLoopId) cancelAnimationFrame(gameLoopId);
+
+    if (typeof CraftManager !== 'undefined') {
+        CraftManager.init();
+        CraftManager.start(currentTotal); // 現在の所持数を渡す
+    } else {
+        console.error("CraftManager not found");
+        isGameRunning = true;
+        gameLoopId = requestAnimationFrame(gameLoop);
+    }
+}
+
+// --- ★追加機能: クラフト消費 ---
+window.consumeCraftMaterials = function (setAmount) {
+    const cost = setAmount * 5;
+    if (score >= cost) {
+        score -= cost;
+    } else {
+        const diff = cost - score;
+        score = 0;
+        totalItemCount -= diff;
+    }
+    updateScoreDisplay();
+};
+
+// --- ★追加機能: クラフト終了時の復帰 ---
+window.resetGameFromCraft = function (starRewardAmount) {
+    isGameRunning = true;
+
+    if (typeof AudioSys !== 'undefined' && !AudioSys.isMuted) {
+        AudioSys.playBGM('atelier', 0.3);
+    }
+
+    totalStarCount += starRewardAmount;
+    AudioSys.playTone(1200, 'sine', 0.3);
+    updateScoreDisplay();
+
+    updateCamera();
+
+    if (gameLoopId) cancelAnimationFrame(gameLoopId);
+    gameLoopId = requestAnimationFrame(gameLoop);
 };

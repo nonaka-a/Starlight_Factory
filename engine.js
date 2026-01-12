@@ -15,10 +15,35 @@ const keys = {
     KeyB: false
 };
 
+// ★追加: ポインター入力管理
+const Input = {
+    x: 0,
+    y: 0,
+    isDown: false,
+    isJustPressed: false, // そのフレームで押された瞬間だけtrue
+    _pressedThisFrame: false, // 内部制御用
+
+    // フレームの頭で呼ぶ
+    update: function() {
+        this.isJustPressed = this._pressedThisFrame;
+        this._pressedThisFrame = false;
+    },
+    
+    // 座標計算用ヘルパー
+    updatePosition: function(clientX, clientY) {
+        if (!canvas) return;
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = CANVAS_WIDTH / rect.width;
+        const scaleY = CANVAS_HEIGHT / rect.height;
+        this.x = (clientX - rect.left) * scaleX;
+        this.y = (clientY - rect.top) * scaleY;
+    }
+};
+
 // --- 入力処理 ---
 function setupControls() {
     window.addEventListener('keydown', (e) => {
-        // ★修正: BGM再生トリガーを追加
+        // BGM再生トリガー
         AudioSys.init();
         if (typeof AudioSys.playBGM === 'function' && !AudioSys.bgmSource && !AudioSys.isMuted) {
             const bgmName = (typeof isAtelierMode !== 'undefined' && isAtelierMode) ? 'atelier' : 'forest';
@@ -39,6 +64,47 @@ function setupControls() {
         if (e.code === 'ArrowDown') keys.ArrowDown = false;
         if (e.code === 'KeyB' || e.code === 'KeyZ') keys.KeyB = false;
     });
+
+    // --- ★追加: マウス/タッチ入力 (全体) ---
+    const onPointerDown = (e) => {
+        if (!canvas) return;
+        Input.isDown = true;
+        Input._pressedThisFrame = true;
+        
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        Input.updatePosition(clientX, clientY);
+        
+        if (typeof AudioSys !== 'undefined') AudioSys.init();
+    };
+
+    const onPointerMove = (e) => {
+        if (!canvas) return;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        Input.updatePosition(clientX, clientY);
+        
+        // タッチ操作時のスクロール防止
+        if(e.cancelable && e.target === canvas) e.preventDefault();
+    };
+
+    const onPointerUp = () => {
+        Input.isDown = false;
+    };
+
+    window.addEventListener('mousedown', onPointerDown);
+    window.addEventListener('mousemove', onPointerMove);
+    window.addEventListener('mouseup', onPointerUp);
+
+    // スマホ用
+    setTimeout(() => {
+        if(canvas) {
+            canvas.addEventListener('touchstart', onPointerDown, { passive: false });
+            canvas.addEventListener('touchmove', onPointerMove, { passive: false });
+            canvas.addEventListener('touchend', onPointerUp);
+        }
+    }, 500);
+
     setupTouchControls();
 }
 
@@ -49,14 +115,11 @@ function setupTouchControls() {
 
         const down = (e) => {
             if (e.cancelable) e.preventDefault();
-
-            // ★修正: BGM再生トリガーを追加
             AudioSys.init();
             if (typeof AudioSys.playBGM === 'function' && !AudioSys.bgmSource && !AudioSys.isMuted) {
                 const bgmName = (typeof isAtelierMode !== 'undefined' && isAtelierMode) ? 'atelier' : 'forest';
                 AudioSys.playBGM(bgmName, 0.3);
             }
-
             keys[code] = true;
             btn.classList.add('active');
         };
@@ -87,7 +150,7 @@ function setupTouchControls() {
 
 function changeZoom(delta) {
     ZOOM_LEVEL = Math.max(0.5, Math.min(3.0, ZOOM_LEVEL + delta));
-    updateCamera(); // game.jsで定義
+    if(typeof updateCamera === 'function') updateCamera();
 }
 
 function toggleFullScreen() {
@@ -98,7 +161,6 @@ function toggleFullScreen() {
     }
 }
 
-// let isMuted = false; // 削除: AudioSys.isMutedを使用
 function toggleMute() {
     AudioSys.isMuted = !AudioSys.isMuted;
     if (AudioSys.ctx) {
@@ -106,7 +168,6 @@ function toggleMute() {
             AudioSys.ctx.suspend();
         } else {
             AudioSys.ctx.resume();
-            // ミュート解除時に再生されていなければ再生
             if (typeof AudioSys.playBGM === 'function' && !AudioSys.bgmSource) {
                 const bgmName = (typeof isAtelierMode !== 'undefined' && isAtelierMode) ? 'atelier' : 'forest';
                 AudioSys.playBGM(bgmName, 0.3);
@@ -119,14 +180,12 @@ function toggleMute() {
 
 function fitWindow() {
     const wrapper = document.getElementById('main-wrapper');
-    // UIパネル分の高さ加算(+160)を削除し、純粋にCanvasサイズで計算
     const totalHeight = CANVAS_HEIGHT;
     const totalWidth = CANVAS_WIDTH;
 
-    // ウィンドウサイズに合わせてスケール計算
     const scaleX = window.innerWidth / totalWidth;
     const scaleY = window.innerHeight / totalHeight;
-    const scale = Math.min(scaleX, scaleY); // 画面に収まる最大サイズ
+    const scale = Math.min(scaleX, scaleY);
 
     wrapper.style.transform = `scale(${scale})`;
 }
