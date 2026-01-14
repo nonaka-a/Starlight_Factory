@@ -15,7 +15,7 @@
     "type": "normal"
   },
   {
-    "time": 5.204840239125952,
+    "time": 5.198173572459285,
     "lane": "red",
     "type": "normal"
   },
@@ -25,12 +25,12 @@
     "type": "normal"
   },
   {
-    "time": 6.4064728921871765,
+    "time": 6.006472892187176,
     "lane": "blue",
     "type": "normal"
   },
   {
-    "time": 7.204691816120385,
+    "time": 7.198025149453718,
     "lane": "red",
     "type": "normal"
   },
@@ -45,7 +45,7 @@
     "type": "normal"
   },
   {
-    "time": 8.806101834673262,
+    "time": 8.802768501339928,
     "lane": "blue",
     "type": "normal"
   },
@@ -60,70 +60,16 @@
     "type": "normal"
   },
   {
-    "time": 11.133156050298897,
+    "time": 11.19648938363223,
     "lane": "blue",
     "type": "long",
     "duration": 1
   },
   {
-    "time": 12.80140177283034,
+    "time": 12.816972789115656,
     "lane": "red",
-    "type": "normal"
-  },
-  {
-    "time": 12.991564625850337,
-    "lane": "blue",
-    "type": "normal"
-  },
-  {
-    "time": 13.200544217687074,
-    "lane": "red",
-    "type": "normal"
-  },
-  {
-    "time": 13.60689342403628,
-    "lane": "blue",
-    "type": "normal"
-  },
-  {
-    "time": 13.810068027210882,
-    "lane": "red",
-    "type": "normal"
-  },
-  {
-    "time": 14.0073716759431,
-    "lane": "blue",
-    "type": "normal"
-  },
-  {
-    "time": 14.407215007215006,
-    "lane": "blue",
-    "type": "normal"
-  },
-  {
-    "time": 14.41308596165739,
-    "lane": "red",
-    "type": "normal"
-  },
-  {
-    "time": 14.80482374768089,
-    "lane": "blue",
-    "type": "normal"
-  },
-  {
-    "time": 14.806291486291483,
-    "lane": "red",
-    "type": "normal"
-  },
-  {
-    "time": 15.19445887445887,
-    "lane": "blue",
-    "type": "normal"
-  },
-  {
-    "time": 15.208303442589154,
-    "lane": "red",
-    "type": "normal"
+    "type": "long",
+    "duration": 2.4233333333333333
   },
   {
     "time": 16.00282003710575,
@@ -136,17 +82,17 @@
     "type": "normal"
   },
   {
-    "time": 16.803141620284478,
+    "time": 16.799808286951144,
     "lane": "red",
     "type": "normal"
   },
   {
-    "time": 17.20592042877757,
+    "time": 17.202587095444237,
     "lane": "blue",
     "type": "normal"
   },
   {
-    "time": 17.608451865594724,
+    "time": 17.60511853226139,
     "lane": "red",
     "type": "normal"
   },
@@ -156,7 +102,7 @@
     "type": "normal"
   },
   {
-    "time": 18.40643578643578,
+    "time": 18.403102453102445,
     "lane": "red",
     "type": "normal"
   },
@@ -166,7 +112,7 @@
     "type": "normal"
   },
   {
-    "time": 19.604782519068234,
+    "time": 19.598115852401566,
     "lane": "blue",
     "type": "normal"
   },
@@ -176,12 +122,12 @@
     "type": "normal"
   },
   {
-    "time": 20.803545660688517,
+    "time": 20.800212327355183,
     "lane": "red",
     "type": "normal"
   },
   {
-    "time": 21.214232117089256,
+    "time": 21.19756545042259,
     "lane": "red",
     "type": "normal"
   },
@@ -191,17 +137,17 @@
     "type": "normal"
   },
   {
-    "time": 22.40712430426716,
+    "time": 22.403790970933827,
     "lane": "blue",
     "type": "normal"
   },
   {
-    "time": 22.807668521954238,
+    "time": 22.797668521954236,
     "lane": "blue",
     "type": "normal"
   },
   {
-    "time": 23.2126159554731,
+    "time": 23.19928262213977,
     "lane": "blue",
     "type": "normal"
   },
@@ -212,13 +158,18 @@
     "duration": 1
   },
   {
-    "time": 25.602102659245517,
+    "time": 25.598769325912183,
     "lane": "red",
     "type": "normal"
   },
   {
-    "time": 25.606439909297052,
+    "time": 25.599773242630384,
     "lane": "blue",
+    "type": "normal"
+  },
+  {
+    "time": 26.400463821892387,
+    "lane": "red",
     "type": "normal"
   },
   {
@@ -227,30 +178,15 @@
     "type": "normal"
   },
   {
-    "time": 26.41046382189239,
-    "lane": "red",
-    "type": "normal"
-  },
-  {
     "time": 27.19856112141826,
     "lane": "red",
     "type": "long",
-    "duration": 0.6072727272727273
+    "duration": 0.8006060606060607
   },
   {
     "time": 27.202197485054622,
     "lane": "blue",
     "type": "long",
-    "duration": 0.5890909090909091
-  },
-  {
-    "time": 28.008303442589156,
-    "lane": "blue",
-    "type": "normal"
-  },
-  {
-    "time": 28.014875283446713,
-    "lane": "red",
-    "type": "normal"
+    "duration": 0.7924242424242425
   }
 ]
