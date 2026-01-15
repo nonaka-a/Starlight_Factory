@@ -123,6 +123,10 @@ function setupControls() {
                 found.x = pos.x;
                 found.y = pos.y;
             }
+
+            // 互換性のためにメイン座標も更新 (最後に動かした指の座標にする)
+            Input.x = pos.x;
+            Input.y = pos.y;
         }
     };
 
