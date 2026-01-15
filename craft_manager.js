@@ -15,7 +15,7 @@ const CraftManager = {
     // 共通データ
     craftAmount: 1,
     maxCraftAmount: 1,
-    
+
     // ★追加: 外部から読み込んだ譜面データ
     externalChartData: null,
 
@@ -46,9 +46,9 @@ const CraftManager = {
         }
         // 各モジュールの初期化があればここで呼ぶ
     },
-    
+
     // ★追加: 譜面データをセットするメソッド
-    loadChart: function(data) {
+    loadChart: function (data) {
         this.externalChartData = data;
         console.log("譜面データをロードしました", data.length, "ノーツ");
     },
@@ -250,7 +250,7 @@ const CraftManager = {
         if (this.state === 'mixing') {
             this.state = 'molding';
             this.camera.targetX = 1000;
-            
+
             // ★追加: 譜面データがあればセット
             if (CraftMolding) {
                 if (this.externalChartData) {
@@ -258,7 +258,7 @@ const CraftManager = {
                 }
                 CraftMolding.init();
             }
-            
+
         } else if (this.state === 'molding') {
             this.state = 'firing';
             this.camera.targetX = 2000;
@@ -415,7 +415,7 @@ const CraftManager = {
     // 左下に表示する吹き出しテキスト
     drawSpeechBubble: function (offsetX, text) {
         const ctx = this.ctx;
-        const x = offsetX + 50;
+        const x = offsetX + 20; // 50から20へ変更
         const y = 480;
         const w = 350;
         const h = 80;
