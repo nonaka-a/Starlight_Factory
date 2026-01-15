@@ -323,12 +323,25 @@ const CraftMolding = {
         let touchRed = false;
         let touchBlue = false;
 
-        if (Input.isJustPressed) {
+        // マルチタッチ判定
+        for (const touch of Input.touches) {
+            if (touch.isJustPressed) {
+                const mx = touch.x;
+                const my = touch.y;
+                if (my > 360 && my < 600) { // 判定エリアを少し広めに
+                    if (mx >= 0 && mx <= 490) touchRed = true;
+                    else if (mx >= 510 && mx <= 1000) touchBlue = true;
+                }
+            }
+        }
+
+        // マウス/シングルタッチのフォールバック
+        if (Input.isJustPressed && Input.touches.length === 0) {
             const mx = Input.x;
             const my = Input.y;
-            if (my > 360 && my < 550) {
-                if (mx >= 50 && mx <= 480) touchRed = true;
-                else if (mx >= 520 && mx <= 950) touchBlue = true;
+            if (my > 360 && my < 600) {
+                if (mx >= 0 && mx <= 490) touchRed = true;
+                else if (mx >= 510 && mx <= 1000) touchBlue = true;
             }
         }
 

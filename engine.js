@@ -15,28 +15,33 @@ const keys = {
     KeyB: false
 };
 
-// ★追加: ポインター入力管理
+// ★追加: ポインター入力管理 (マルチタッチ対応)
 const Input = {
     x: 0,
     y: 0,
     isDown: false,
-    isJustPressed: false, // そのフレームで押された瞬間だけtrue
-    _pressedThisFrame: false, // 内部制御用
+    isJustPressed: false,
+    touches: [], // {x, y, isJustPressed, id} の配列
+    _pressedThisFrame: false,
 
-    // フレームの頭で呼ぶ
-    update: function() {
+    update: function () {
         this.isJustPressed = this._pressedThisFrame;
         this._pressedThisFrame = false;
+        // 各タッチのisJustPressedをリセット
+        for (let t of this.touches) {
+            t.isJustPressed = false;
+        }
     },
-    
-    // 座標計算用ヘルパー
-    updatePosition: function(clientX, clientY) {
-        if (!canvas) return;
+
+    updatePosition: function (clientX, clientY) {
+        if (!canvas) return { x: 0, y: 0 };
         const rect = canvas.getBoundingClientRect();
         const scaleX = CANVAS_WIDTH / rect.width;
         const scaleY = CANVAS_HEIGHT / rect.height;
-        this.x = (clientX - rect.left) * scaleX;
-        this.y = (clientY - rect.top) * scaleY;
+        return {
+            x: (clientX - rect.left) * scaleX,
+            y: (clientY - rect.top) * scaleY
+        };
     }
 };
 
@@ -65,43 +70,81 @@ function setupControls() {
         if (e.code === 'KeyB' || e.code === 'KeyZ') keys.KeyB = false;
     });
 
-    // --- ★追加: マウス/タッチ入力 (全体) ---
-    const onPointerDown = (e) => {
-        if (!canvas) return;
+    // --- マウス入力 ---
+    window.addEventListener('mousedown', (e) => {
         Input.isDown = true;
         Input._pressedThisFrame = true;
-        
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        Input.updatePosition(clientX, clientY);
-        
+        const pos = Input.updatePosition(e.clientX, e.clientY);
+        Input.x = pos.x;
+        Input.y = pos.y;
         if (typeof AudioSys !== 'undefined') AudioSys.init();
-    };
-
-    const onPointerMove = (e) => {
-        if (!canvas) return;
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        Input.updatePosition(clientX, clientY);
-        
-        // タッチ操作時のスクロール防止
-        if(e.cancelable && e.target === canvas) e.preventDefault();
-    };
-
-    const onPointerUp = () => {
+    });
+    window.addEventListener('mousemove', (e) => {
+        const pos = Input.updatePosition(e.clientX, e.clientY);
+        Input.x = pos.x;
+        Input.y = pos.y;
+    });
+    window.addEventListener('mouseup', () => {
         Input.isDown = false;
+    });
+
+    // --- スマホ用マルチタッチ ---
+    const onTouchStart = (e) => {
+        if (e.cancelable) e.preventDefault();
+        if (typeof AudioSys !== 'undefined') AudioSys.init();
+
+        Input.isDown = true;
+        Input._pressedThisFrame = true;
+
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const t = e.changedTouches[i];
+            const pos = Input.updatePosition(t.clientX, t.clientY);
+            Input.touches.push({
+                id: t.identifier,
+                x: pos.x,
+                y: pos.y,
+                isJustPressed: true
+            });
+            // 互換性のためのメイン座標更新
+            if (i === 0) {
+                Input.x = pos.x;
+                Input.y = pos.y;
+            }
+        }
     };
 
-    window.addEventListener('mousedown', onPointerDown);
-    window.addEventListener('mousemove', onPointerMove);
-    window.addEventListener('mouseup', onPointerUp);
+    const onTouchMove = (e) => {
+        if (e.cancelable) e.preventDefault();
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const t = e.changedTouches[i];
+            const pos = Input.updatePosition(t.clientX, t.clientY);
+            const found = Input.touches.find(it => it.id === t.identifier);
+            if (found) {
+                found.x = pos.x;
+                found.y = pos.y;
+            }
+        }
+    };
 
-    // スマホ用
+    const onTouchEnd = (e) => {
+        for (let i = 0; i < e.changedTouches.length; i++) {
+            const t = e.changedTouches[i];
+            const idx = Input.touches.findIndex(it => it.id === t.identifier);
+            if (idx !== -1) {
+                Input.touches.splice(idx, 1);
+            }
+        }
+        if (Input.touches.length === 0) {
+            Input.isDown = false;
+        }
+    };
+
     setTimeout(() => {
-        if(canvas) {
-            canvas.addEventListener('touchstart', onPointerDown, { passive: false });
-            canvas.addEventListener('touchmove', onPointerMove, { passive: false });
-            canvas.addEventListener('touchend', onPointerUp);
+        if (canvas) {
+            canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+            canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+            canvas.addEventListener('touchend', onTouchEnd);
+            canvas.addEventListener('touchcancel', onTouchEnd);
         }
     }, 500);
 
@@ -150,7 +193,7 @@ function setupTouchControls() {
 
 function changeZoom(delta) {
     ZOOM_LEVEL = Math.max(0.5, Math.min(3.0, ZOOM_LEVEL + delta));
-    if(typeof updateCamera === 'function') updateCamera();
+    if (typeof updateCamera === 'function') updateCamera();
 }
 
 function toggleFullScreen() {
