@@ -506,12 +506,13 @@ const CraftMolding = {
         }
 
         CraftManager.drawTitle(offsetX, "かたぬき");
+        CraftManager.drawSpeechBubble(offsetX, "タイミングよくボタンをおそう！");
         
         ctx.fillStyle = '#fff';
         ctx.font = "bold 24px 'M PLUS Rounded 1c', sans-serif";
         ctx.textAlign = 'right';
-        ctx.fillText(`Perfect: ${this.stats.perfect}`, offsetX + 950, 50);
-        ctx.fillText(`Good: ${this.stats.good}`, offsetX + 950, 80);
+        ctx.fillText(`パーフェクト: ${this.stats.perfect}`, offsetX + 950, 80);
+        ctx.fillText(`グッド: ${this.stats.good}`, offsetX + 950, 110);
 
         if (this.feedback.timer > 0 && this.feedback.type) {
             let fbImg = null;
