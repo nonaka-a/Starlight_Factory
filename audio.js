@@ -107,5 +107,27 @@ const AudioSys = {
     seGameOver: function () {
         this.stopBGM();
         this.playTone(100, 'sawtooth', 0.5, 0.2);
+    },
+    playSE: function (name, vol = 0.5) {
+        if (!this.ctx || !this.buffers[name]) return;
+        const source = this.ctx.createBufferSource();
+        source.buffer = this.buffers[name];
+        const gain = this.ctx.createGain();
+        gain.gain.value = vol;
+        source.connect(gain);
+        gain.connect(this.ctx.destination);
+        source.start(0);
+    },
+    startLoop: function (name, vol = 0.5) {
+        if (!this.ctx || !this.buffers[name]) return null;
+        const source = this.ctx.createBufferSource();
+        source.buffer = this.buffers[name];
+        source.loop = true;
+        const gain = this.ctx.createGain();
+        gain.gain.value = vol;
+        source.connect(gain);
+        gain.connect(this.ctx.destination);
+        source.start(0);
+        return source;
     }
 };

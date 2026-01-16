@@ -106,6 +106,14 @@ const CraftManager = {
     },
 
     update: function () {
+        // デバッグ: 'C'キーで工程スキップ
+        if (keys.KeyC) {
+            keys.KeyC = false; // 連続スキップ防止
+            console.log("Debug: Skipping stage");
+            this.goToNextState();
+            return;
+        }
+
         this.camera.x += (this.camera.targetX - this.camera.x) * 0.1;
 
         // 確認ダイアログ表示中
@@ -163,31 +171,43 @@ const CraftManager = {
         ctx.translate(-this.camera.x, 0);
 
         // 各工程の描画
-        // モジュールが存在するかチェックしながら描画
+        // カメラ位置に基づいて描画すべきステージのみを描画し、表示バグを防ぐ
 
         // Craft 1 (Select/Pour/Mix) - Offset 0
-        if (typeof CraftMixing !== 'undefined') {
-            this.drawTable(0, "");
-            if (this.state === 'select') CraftMixing.drawSelect(0);
-            else if (this.state === 'pouring' || this.state === 'mixing') CraftMixing.drawMixArea(0);
+        if (Math.abs(this.camera.x - 0) < 1100) {
+            if (typeof CraftMixing !== 'undefined') {
+                this.drawTable(0, "");
+                // 工程が進んでも、カメラに映っている間は描画を続ける
+                if (this.state === 'select') {
+                    CraftMixing.drawSelect(0);
+                } else {
+                    CraftMixing.drawMixArea(0);
+                }
+            }
         }
 
         // Craft 2 (Mold) - Offset 1000
-        if (typeof CraftMolding !== 'undefined') {
-            this.drawTable(1000, "");
-            CraftMolding.draw(1000);
+        if (Math.abs(this.camera.x - 1000) < 1100) {
+            if (typeof CraftMolding !== 'undefined') {
+                this.drawTable(1000, "");
+                CraftMolding.draw(1000);
+            }
         }
 
         // Craft 3 (Fire) - Offset 2000
-        if (typeof CraftFiring !== 'undefined') {
-            this.drawTable(2000, "");
-            CraftFiring.draw(2000);
+        if (Math.abs(this.camera.x - 2000) < 1100) {
+            if (typeof CraftFiring !== 'undefined') {
+                this.drawTable(2000, "");
+                CraftFiring.draw(2000);
+            }
         }
 
         // Craft 4 (Polish) - Offset 3000
-        if (typeof CraftPolishing !== 'undefined') {
-            this.drawTable(3000, "");
-            CraftPolishing.draw(3000);
+        if (Math.abs(this.camera.x - 3000) < 1100) {
+            if (typeof CraftPolishing !== 'undefined') {
+                this.drawTable(3000, "");
+                CraftPolishing.draw(3000);
+            }
         }
 
         ctx.restore();
@@ -248,6 +268,9 @@ const CraftManager = {
         this.resetNextBtn();
 
         if (this.state === 'mixing') {
+            if (CraftMixing && CraftMixing.end) {
+                CraftMixing.end();
+            }
             this.state = 'molding';
             this.camera.targetX = 1000;
 
@@ -260,14 +283,26 @@ const CraftManager = {
             }
 
         } else if (this.state === 'molding') {
+            // 前の工程の終了処理
+            if (CraftMolding && CraftMolding.end) {
+                CraftMolding.end();
+            }
+
             this.state = 'firing';
             this.camera.targetX = 2000;
             if (CraftFiring) CraftFiring.init();
         } else if (this.state === 'firing') {
+            // 前の工程の終了処理 (火の音などを止める)
+            if (CraftFiring && CraftFiring.end) {
+                CraftFiring.end();
+            }
             this.state = 'polishing';
             this.camera.targetX = 3000;
             if (CraftPolishing) CraftPolishing.init();
         } else if (this.state === 'polishing') {
+            if (CraftPolishing && CraftPolishing.end) {
+                CraftPolishing.end();
+            }
             this.stop();
         }
     },

@@ -12,7 +12,8 @@ const keys = {
     ArrowRight: false,
     ArrowDown: false,
     Space: false,
-    KeyB: false
+    KeyB: false,
+    KeyC: false
 };
 
 // ★追加: ポインター入力管理 (マルチタッチ対応)
@@ -60,6 +61,7 @@ function setupControls() {
         if (e.code === 'ArrowRight') keys.ArrowRight = true;
         if (e.code === 'ArrowDown') keys.ArrowDown = true;
         if (e.code === 'KeyB' || e.code === 'KeyZ') keys.KeyB = true;
+        if (e.code === 'KeyC') keys.KeyC = true;
     });
 
     window.addEventListener('keyup', (e) => {
@@ -68,6 +70,7 @@ function setupControls() {
         if (e.code === 'ArrowRight') keys.ArrowRight = false;
         if (e.code === 'ArrowDown') keys.ArrowDown = false;
         if (e.code === 'KeyB' || e.code === 'KeyZ') keys.KeyB = false;
+        if (e.code === 'KeyC') keys.KeyC = false;
     });
 
     // --- マウス入力 ---
