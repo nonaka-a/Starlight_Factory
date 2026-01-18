@@ -1,6 +1,5 @@
-
 /**
- * --- Sky Manager: 夜空とキャンバスの管理 ---
+ * --- Sky Manager: 夜空とキャンバスの管理 (Randomized V2) ---
  */
 const SkyManager = {
     // 設定
@@ -39,7 +38,7 @@ const SkyManager = {
         };
     },
 
-    // 最初の夜空の下地を作る（真っ暗だと寂しいのでうっすら星を入れる等も可）
+    // 最初の夜空の下地を作る
     initBackground: function () {
         const ctx = this.ctx;
         // 背景色（濃い紺色グラデーション）
@@ -50,80 +49,143 @@ const SkyManager = {
         ctx.fillRect(0, 0, this.worldWidth, this.worldHeight);
     },
 
-    // --- 外部から呼ばれる描画命令 ---
-    // cx, cy: グリッド座標 (0~), sizeLevel: 0(小)/1(中)/2(大), color: 色コード
+    /**
+     * 指定した座標を中心に、ランダムで自然な星の集まりを描画する
+     * @param {number} gridX - 中心のグリッドX座標
+     * @param {number} gridY - 中心のグリッドY座標
+     * @param {number} sizeLevel - 0:星玉(小), 1:5星玉(中), 2:10星玉(大)
+     * @param {string} color - 色コード
+     */
     drawCluster: function (gridX, gridY, sizeLevel, color) {
         if (!this.isLoaded) return;
 
-        const ctx = this.ctx;
-        const basePx = gridX * this.gridSize;
-        const basePy = gridY * this.gridSize;
-
-        // 範囲の設定 (半径マス数)
+        // 基本半径の設定
         let radius = 1;
         if (sizeLevel === 1) radius = 2; // 5星玉
         if (sizeLevel === 2) radius = 4; // 10星玉
 
-        // 描画設定（加算合成で光らせる）
-        ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-
-        // 色の適用（星画像を白で作っておき、globalCompositeOperationで色味を足す手法もあるが、
-        // ここでは単純に色付き矩形を重ねるか、tint処理が必要。
-        // 簡易的に、先にスタンプを描いて、その上から色を乗算する方式をとる）
-        // ※ここではパフォーマンス重視で、「着色済みのスタンプ」を擬似的に描画するアプローチをとります。
-
-        // 範囲内のセルを走査
+        // --- ステップ1: 基本エリアの描画（ムラ付き） ---
         for (let dy = -radius; dy <= radius; dy++) {
             for (let dx = -radius; dx <= radius; dx++) {
-                // 距離判定
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 if (dist > radius + 0.5) continue;
 
-                // 密度の決定
-                let densityRow = 2; // 低 (index 2)
-                if (dist <= 1) densityRow = 0; // 高 (index 0)
-                else if (dist <= radius * 0.6) densityRow = 1; // 中 (index 1)
+                // 距離ベースの密度決定
+                let densityIndex = 2; // 低 (Row 2)
+                if (dist <= 1.0) densityIndex = 0; // 高 (Row 0)
+                else if (dist <= radius * 0.6) densityIndex = 1; // 中 (Row 1)
 
-                // ランダムにスタンプ選択 (0~9)
-                const stampIndex = Math.floor(Math.random() * 10);
+                // ★ランダム化: 密度のダウングレード（高→中、中→低へ確率で落とす）
+                if (densityIndex === 0 && Math.random() < 0.66) densityIndex = 1;
+                else if (densityIndex === 1 && Math.random() < 0.66) densityIndex = 2;
 
-                // 描画座標
-                const tx = basePx + dx * this.gridSize;
-                const ty = basePy + dy * this.gridSize;
+                // ★ランダム化: 間引き（低密度は確率で描かない）
+                if (densityIndex === 2 && Math.random() < 0.4) continue;
+                if (densityIndex === 1 && Math.random() < 0.1) continue;
 
-                // 範囲外チェック
-                if (tx < 0 || tx >= this.worldWidth || ty < 0 || ty >= this.worldHeight) continue;
+                // 描画実行
+                this.drawStampAtGrid(gridX + dx, gridY + dy, densityIndex, color);
 
-                // スタンプ描画
-                this.drawSingleStamp(ctx, tx, ty, densityRow, stampIndex, color);
+                // ★ランダム化: 重ね打ち（高密度になった場所は確率で2回描く）
+                if (densityIndex === 0 && Math.random() < 0.5) {
+                    this.drawStampAtGrid(gridX + dx, gridY + dy, densityIndex, color);
+                }
             }
         }
-        ctx.restore();
+
+        // --- ステップ2: いびつな拡張 (Spikes) ---
+        // ランダムな2～3方向へ星をはみ出させる
+        const spikeCount = 2 + Math.floor(Math.random() * 2); 
+        for (let i = 0; i < spikeCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const spikeLen = radius + 2 + Math.floor(Math.random() * 3); // 半径+2~4マス
+            
+            // 中心から指定方向へ線を伸ばし、はみ出た部分に星を置く
+            for (let d = radius + 1; d <= spikeLen; d++) {
+                const ox = Math.round(Math.cos(angle) * d);
+                const oy = Math.round(Math.sin(angle) * d);
+                
+                // 飛び石のようにまばらに描く
+                if (Math.random() < 0.6) {
+                    // 基本は低密度、たまに中密度
+                    const spikeDensity = (Math.random() < 0.2) ? 1 : 2;
+                    this.drawStampAtGrid(gridX + ox, gridY + oy, spikeDensity, color);
+                }
+            }
+        }
+
+        // --- ステップ3: 飛び地 (Strays) ---
+        // 離れた場所にポツンと星を置く
+        const strayCount = 2 + Math.floor(Math.random() * 4);
+        for (let i = 0; i < strayCount; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = radius * (1.5 + Math.random() * 0.8); // 半径の1.5~2.3倍
+            
+            const sx = Math.round(Math.cos(angle) * dist);
+            const sy = Math.round(Math.sin(angle) * dist);
+            
+            this.drawStampAtGrid(gridX + sx, gridY + sy, 2, color); // 低密度
+        }
     },
 
-    drawSingleStamp: function (ctx, x, y, row, col, color) {
-        const sw = 32, sh = 32;
+    /**
+     * 1マスの描画処理（位置ズレ・サイズ変化を含む）
+     */
+    drawStampAtGrid: function (gx, gy, densityIndex, color) {
+        // グリッド座標をピクセル座標へ
+        const px = gx * this.gridSize;
+        const py = gy * this.gridSize;
+
+        // 画面外チェック
+        if (px < 0 || px >= this.worldWidth || py < 0 || py >= this.worldHeight) return;
+
+        // ★ランダム化: 位置ズレ (Jitter) ±10px
+        const jitterX = (Math.random() - 0.5) * 20;
+        const jitterY = (Math.random() - 0.5) * 20;
+
+        // ★ランダム化: サイズ変化 0.8 ~ 1.3倍
+        const scale = 0.8 + Math.random() * 0.5;
+
+        // ★ランダム化: スタンプ画像の選択 (0~9)
+        const stampCol = Math.floor(Math.random() * 10);
+
+        this.drawSingleStamp(
+            this.ctx,
+            px + jitterX,
+            py + jitterY,
+            densityIndex, // Row
+            stampCol,     // Col
+            color,
+            scale
+        );
+    },
+
+    drawSingleStamp: function (ctx, x, y, row, col, color, scale) {
+        const sw = 32, sh = 32; // スタンプ1コマのサイズ
         const sx = col * sw;
         const sy = row * sh;
 
         ctx.save();
-        ctx.translate(x + sw / 2, y + sh / 2);
-
-        // ランダム回転・反転
-        const angle = Math.floor(Math.random() * 4) * (Math.PI / 2);
+        // 中心を基準に移動・回転・拡大縮小
+        ctx.translate(x + this.gridSize / 2, y + this.gridSize / 2);
+        
+        const angle = Math.floor(Math.random() * 4) * (Math.PI / 2); // 0, 90, 180, 270度
         ctx.rotate(angle);
-        if (Math.random() < 0.5) ctx.scale(-1, 1);
+        if (Math.random() < 0.5) ctx.scale(-scale, scale); // 左右反転 + サイズ適用
+        else ctx.scale(scale, scale);
 
-        // 加算合成ですべて描画する (背景が暗いのでこれが一番きれい)
+        // 加算合成 (Lighter) で描画
         ctx.globalCompositeOperation = 'lighter';
 
-        // 色を纏わせるために shadowBlur を使用
+        // 1. 光彩（色）
         ctx.shadowColor = color;
-        ctx.shadowBlur = 15; // 少し強めにしても良いかも
+        ctx.shadowBlur = 15;
         ctx.globalAlpha = 1.0;
 
-        // 2. 星スタンプを描画 (本体)
+        // 2. スタンプ描画
+        // 画像自体は白で作られている前提。
+        // globalCompositeOperation='lighter' の状態で、shadowColor に色を設定して描画することで
+        // 白い星がその色でぼんやり光るような効果を狙う。
         ctx.drawImage(this.stampsImage, sx, sy, sw, sh, -sw / 2, -sh / 2, sw, sh);
 
         ctx.restore();
@@ -179,7 +241,7 @@ const SkyManager = {
             this.uiTimer = 0; // 触ったらUI表示
             this.uiAlpha = 1.0;
 
-            // 戻るボタン判定 (右下)
+            // 戻るボタン判定 (右下エリア)
             if (Input.x > 850 && Input.y > 500) {
                 this.stopGazing();
                 return;
@@ -203,9 +265,9 @@ const SkyManager = {
             this.isDragging = false;
         }
 
-        // UI自動非表示
+        // UI自動フェードアウト
         this.uiTimer++;
-        if (this.uiTimer > 180) { // 3秒後
+        if (this.uiTimer > 180) {
             this.uiAlpha = Math.max(0, this.uiAlpha - 0.05);
         }
     },
@@ -226,7 +288,6 @@ const SkyManager = {
         }
 
         // 2. キャラクター（赤まいまい・ピンクまいまい）を合成
-        // 常に画面手前に座っている演出
         this.drawCharacters(ctx);
 
         // 3. UI（戻るボタンなど）
@@ -255,7 +316,6 @@ const SkyManager = {
 
     drawCharacters: function (ctx) {
         // 簡易描画：丘と背中
-        // 本来は画像を用意して drawImage する
         ctx.fillStyle = '#1a237e'; // 暗い丘の色
         ctx.beginPath();
         ctx.ellipse(500, 700, 600, 200, 0, 0, Math.PI * 2);
