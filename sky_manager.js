@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------
-   FILE: sky_manager.js (Auto Hide UI Ver.)
+   FILE: sky_manager.js (Star Size Adjustment Ver.)
    ------------------------------------------------------------ */
 
 /**
@@ -10,8 +10,8 @@ const SkyManager = {
     worldWidth: 2000,
     worldHeight: 1200,
     gridSize: 32,
-    resolutionScale: 2.0, // 高画質化倍率
-    viewScale: 0.5,       // デフォルト倍率 (うちあげ用)
+    resolutionScale: 1.0, // 軽量化維持
+    viewScale: 0.5,       // デフォルト倍率
     
     // 内部変数
     canvas: null,
@@ -21,6 +21,10 @@ const SkyManager = {
     mountainImage: new Image(),
     charImage: new Image(),
     isLoaded: false,
+
+    // データ保存用
+    starDataList: [], 
+    pendingLoadData: null,
 
     // ほしを見るモード用
     isActive: false,
@@ -33,18 +37,15 @@ const SkyManager = {
     init: function () {
         if (this.canvas) return;
 
-        // 裏画面（オフスクリーンキャンバス）
         this.canvas = document.createElement('canvas');
         this.canvas.width = this.worldWidth * this.resolutionScale;
         this.canvas.height = this.worldHeight * this.resolutionScale;
         this.ctx = this.canvas.getContext('2d');
 
-        // BGMロード
         if (typeof AudioSys !== 'undefined') {
             AudioSys.loadBGM('suzumuai', 'sounds/suzumuai.mp3');
         }
 
-        // 画像ロード管理
         let loadedCount = 0;
         const totalImages = 4;
 
@@ -53,6 +54,10 @@ const SkyManager = {
             if (loadedCount >= totalImages) {
                 this.isLoaded = true;
                 this.initBackground();
+                if (this.pendingLoadData) {
+                    this.restoreStarData(this.pendingLoadData);
+                    this.pendingLoadData = null;
+                }
             }
         };
 
@@ -62,24 +67,15 @@ const SkyManager = {
 
         this.bgImage.src = 'image/bg_sky.jpg';
         this.bgImage.onload = checkLoad;
-        this.bgImage.onerror = () => {
-            console.warn("背景画像(bg_sky.jpg)が見つかりません");
-            checkLoad();
-        };
+        this.bgImage.onerror = () => { console.warn("no bg image"); checkLoad(); };
 
         this.mountainImage.src = 'image/bg_mountain.png';
         this.mountainImage.onload = checkLoad;
-        this.mountainImage.onerror = () => {
-            console.warn("山画像(bg_mountain.png)が見つかりません");
-            checkLoad();
-        };
+        this.mountainImage.onerror = () => { console.warn("no mountain image"); checkLoad(); };
 
         this.charImage.src = 'image/maimai_watching.png';
         this.charImage.onload = checkLoad;
-        this.charImage.onerror = () => {
-            console.warn("キャラ画像(maimai_watching.png)が見つかりません");
-            checkLoad();
-        };
+        this.charImage.onerror = () => { console.warn("no char image"); checkLoad(); };
     },
 
     initBackground: function () {
@@ -100,7 +96,30 @@ const SkyManager = {
         ctx.restore();
     },
 
-    // --- 描画命令 ---
+    // --- データ保存・読み込み ---
+    getStarData: function() {
+        return this.starDataList;
+    },
+
+    setStarData: function(dataList) {
+        if (!dataList || !Array.isArray(dataList)) return;
+        if (this.isLoaded) {
+            this.restoreStarData(dataList);
+        } else {
+            this.pendingLoadData = dataList;
+        }
+    },
+
+    restoreStarData: function(dataList) {
+        this.starDataList = dataList; 
+        this.initBackground(); 
+        for (const s of this.starDataList) {
+            this.drawSingleStamp(this.ctx, s.x, s.y, s.row, s.col, s.color, s.scale, false);
+        }
+        console.log(`Restored ${this.starDataList.length} stars.`);
+    },
+
+    // --- 描画ロジック ---
     drawCluster: function (gridX, gridY, sizeLevel, color) {
         if (!this.isLoaded) return;
 
@@ -112,7 +131,7 @@ const SkyManager = {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         
-        // ステップ1: 基本エリア
+        // ステップ1
         for (let dy = -radius; dy <= radius; dy++) {
             for (let dx = -radius; dx <= radius; dx++) {
                 const dist = Math.sqrt(dx * dx + dy * dy);
@@ -136,12 +155,11 @@ const SkyManager = {
             }
         }
 
-        // ステップ2: 拡張
+        // ステップ2
         const spikeCount = 2 + Math.floor(Math.random() * 2); 
         for (let i = 0; i < spikeCount; i++) {
             const angle = Math.random() * Math.PI * 2;
             const spikeLen = radius + 2 + Math.floor(Math.random() * 3);
-            
             for (let d = radius + 1; d <= spikeLen; d++) {
                 const ox = Math.round(Math.cos(angle) * d);
                 const oy = Math.round(Math.sin(angle) * d);
@@ -152,7 +170,7 @@ const SkyManager = {
             }
         }
 
-        // ステップ3: 飛び地 (近距離)
+        // ステップ3
         const strayCount = 2 + Math.floor(Math.random() * 4);
         for (let i = 0; i < strayCount; i++) {
             const angle = Math.random() * Math.PI * 2;
@@ -162,7 +180,7 @@ const SkyManager = {
             this.drawStampAtGrid(gridX + sx, gridY + sy, 2, color);
         }
 
-        // ステップ4: 遠方飛び地
+        // ステップ4
         const farStrayCount = 3 + Math.floor(Math.random() * 4);
         for (let i = 0; i < farStrayCount; i++) {
             const angle = Math.random() * Math.PI * 2;
@@ -181,6 +199,7 @@ const SkyManager = {
 
         if (logicalPx < 0 || logicalPx >= this.worldWidth || logicalPy < 0 || logicalPy >= this.worldHeight) return;
 
+        // ★修正: 星を大きくするので、位置ズレも少し大きく戻す
         const jitterX = (Math.random() - 0.5) * 20;
         const jitterY = (Math.random() - 0.5) * 20;
         const scale = 0.8 + Math.random() * 0.5;
@@ -193,15 +212,27 @@ const SkyManager = {
             densityIndex, 
             stampCol,     
             color,
-            scale * this.resolutionScale
+            scale * this.resolutionScale, 
+            true 
         );
     },
 
-    drawSingleStamp: function (ctx, x, y, row, col, color, scale) {
+    drawSingleStamp: function (ctx, x, y, row, col, color, scale, record) {
+        if (record) {
+            this.starDataList.push({
+                x: x, y: y, row: row, col: col, color: color, scale: scale
+            });
+        }
+
         const sw = 64; 
         const sh = 64;
         const sx = col * sw;
         const sy = row * sh;
+
+        // ★修正: 星のサイズ調整
+        // 0.5だと小さすぎたので 0.8 に変更。
+        // これで 64px * 0.8 = 約51px の大きさで描画され、光の広がりが出ます。
+        const baseScale = 0.8; 
 
         const centerOffset = (this.gridSize / 2) * this.resolutionScale;
 
@@ -210,12 +241,15 @@ const SkyManager = {
         
         const angle = Math.floor(Math.random() * 4) * (Math.PI / 2);
         ctx.rotate(angle);
-        if (Math.random() < 0.5) ctx.scale(-scale, scale);
-        else ctx.scale(scale, scale);
+        
+        const finalScale = scale * baseScale;
+
+        if (Math.random() < 0.5) ctx.scale(-finalScale, finalScale);
+        else ctx.scale(finalScale, finalScale);
 
         ctx.globalCompositeOperation = 'lighter';
         ctx.shadowColor = color;
-        ctx.shadowBlur = 15 * this.resolutionScale; 
+        ctx.shadowBlur = 15 * this.resolutionScale * 0.8; // ぼかしも少し戻す
         ctx.globalAlpha = 1.0;
 
         ctx.drawImage(this.stampsImage, sx, sy, sw, sh, -sw / 2, -sh / 2, sw, sh);
@@ -223,19 +257,16 @@ const SkyManager = {
         ctx.restore();
     },
 
-    // --- ほしを見るモード ---
+    // --- モード制御 ---
     startGazing: function () {
-        this.viewScale = 0.6;
+        this.viewScale = 0.6; 
         
         this.isActive = true;
         this.uiAlpha = 1.0;
         this.uiTimer = 0;
 
-        // タッチ操作UI（dpad等）は非表示
         const ui = document.getElementById('ui-container');
         if (ui) ui.style.display = 'none';
-
-        // ★追加: HTML UIの初期同期（表示）
         this.syncHtmlUiOpacity(1.0);
 
         // カメラ初期位置 (中央)
@@ -259,8 +290,6 @@ const SkyManager = {
         this.isActive = false;
         const ui = document.getElementById('ui-container');
         if (ui) ui.style.display = 'block';
-
-        // ★追加: HTML UIを必ず表示状態に戻す
         this.syncHtmlUiOpacity(1.0);
 
         if (typeof AudioSys !== 'undefined') {
@@ -281,13 +310,12 @@ const SkyManager = {
     },
 
     update: function () {
-        // UI操作（やめるボタン）
         if (Input.isJustPressed) {
             this.isDragging = true;
             this.dragStart.x = Input.x;
             this.dragStart.y = Input.y;
-            this.uiTimer = 0; // 操作したらタイマーリセット
-            this.uiAlpha = 1.0; // UI表示
+            this.uiTimer = 0;
+            this.uiAlpha = 1.0;
 
             if (Input.x > 850 && Input.y > 500) {
                 this.stopGazing();
@@ -298,37 +326,28 @@ const SkyManager = {
         if (Input.isDown && this.isDragging) {
             const dx = (Input.x - this.dragStart.x) / this.viewScale;
             const dy = (Input.y - this.dragStart.y) / this.viewScale;
-            
             this.camera.x -= dx;
             this.camera.y -= dy;
             this.dragStart.x = Input.x;
             this.dragStart.y = Input.y;
-
             this.clampCamera();
         } else {
             this.isDragging = false;
         }
 
-        // UI自動フェードアウト
         this.uiTimer++;
-        if (this.uiTimer > 180) { // 3秒経過後
+        if (this.uiTimer > 180) {
             this.uiAlpha = Math.max(0, this.uiAlpha - 0.05);
         }
-
-        // ★追加: HTML側のUI要素もCanvasのUIAlphaと同期させる
         this.syncHtmlUiOpacity(this.uiAlpha);
     },
 
-    // ★追加: HTML要素の透明度を一括制御するヘルパー関数
     syncHtmlUiOpacity: function(alpha) {
-        // 消したいHTML要素のIDリスト
         const ids = ['item-counter', 'star-counter', 'hp-counter', 'control-panel'];
-        
         ids.forEach(id => {
             const el = document.getElementById(id);
             if (el) {
                 el.style.opacity = alpha;
-                // 透明になったらクリックできないようにする（誤操作防止）
                 el.style.pointerEvents = alpha > 0.1 ? 'auto' : 'none';
             }
         });
@@ -337,50 +356,34 @@ const SkyManager = {
     clampCamera: function() {
         const visibleW = 1000 / this.viewScale;
         const visibleH = 600 / this.viewScale;
-        
         const maxX = Math.max(0, this.worldWidth - visibleW);
         const maxY = Math.max(0, this.worldHeight - visibleH);
-
         this.camera.x = Math.max(0, Math.min(maxX, this.camera.x));
         this.camera.y = Math.max(0, Math.min(maxY, this.camera.y));
     },
 
     draw: function () {
         const ctx = canvas.getContext('2d');
-
         const visibleW = 1000 / this.viewScale;
         const visibleH = 600 / this.viewScale;
 
-        // 1. 空 + 星 (裏画面)
         if (this.canvas) {
             const sX = this.camera.x * this.resolutionScale;
             const sY = this.camera.y * this.resolutionScale;
             const sW = visibleW * this.resolutionScale;
             const sH = visibleH * this.resolutionScale;
-            
-            ctx.drawImage(
-                this.canvas,
-                sX, sY, sW, sH,   
-                0, 0, 1000, 600   
-            );
+            ctx.drawImage(this.canvas, sX, sY, sW, sH, 0, 0, 1000, 600);
         } else {
             ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, 1000, 600);
         }
 
-        // 2. 山 (前景)
         if (this.mountainImage.complete && this.mountainImage.naturalWidth > 0) {
-            ctx.drawImage(
-                this.mountainImage,
-                this.camera.x, this.camera.y, visibleW, visibleH,
-                0, 0, 1000, 600
-            );
+            ctx.drawImage(this.mountainImage, this.camera.x, this.camera.y, visibleW, visibleH, 0, 0, 1000, 600);
         }
 
-        // 3. キャラクター
         this.drawCharacters(ctx);
 
-        // 4. UI (Canvas内)
         if (this.uiAlpha > 0) {
             ctx.globalAlpha = this.uiAlpha;
             ctx.fillStyle = '#ff6b6b';
@@ -392,7 +395,6 @@ const SkyManager = {
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText("もどる", 920, 550);
-            
             ctx.textAlign = 'left';
             ctx.fillStyle = '#fff';
             ctx.fillText("ドラッグで夜空を見渡せます", 20, 570);
@@ -401,7 +403,6 @@ const SkyManager = {
     },
 
     drawCharacters: function (ctx) {
-        // 画像: サイズ半分・少し右へ
         if (this.charImage.complete && this.charImage.naturalWidth > 0) {
             const imgW = this.charImage.naturalWidth * 0.5;
             const imgH = this.charImage.naturalHeight * 0.5;
@@ -409,7 +410,6 @@ const SkyManager = {
             const y = 600 - imgH; 
             ctx.drawImage(this.charImage, x, y, imgW, imgH);
         } else {
-            // 仮描画
             ctx.fillStyle = '#1a237e'; 
             ctx.beginPath();
             ctx.ellipse(500, 700, 600, 200, 0, 0, Math.PI * 2);
@@ -418,15 +418,9 @@ const SkyManager = {
             ctx.beginPath();
             ctx.arc(450, 530, 25, 0, Math.PI * 2);
             ctx.fill();
-            ctx.beginPath();
-            ctx.ellipse(450, 560, 30, 40, 0, 0, Math.PI * 2);
-            ctx.fill();
             ctx.fillStyle = '#f48fb1'; 
             ctx.beginPath();
             ctx.arc(520, 535, 23, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.ellipse(520, 565, 28, 38, 0, 0, Math.PI * 2);
             ctx.fill();
         }
     }

@@ -46,6 +46,72 @@ let atelierStations = [];
 let score = 0; // 現在のステージ内での「ほしのもと」取得数
 
 /**
+ * --- データマネージャー (セーブ・ロード) ---
+ */
+const DataManager = {
+    SAVE_KEY: 'hoshizora_save_v1',
+
+    save: function() {
+        // SkyManagerから星データ取得
+        let skyData = [];
+        if (typeof SkyManager !== 'undefined' && SkyManager.getStarData) {
+            skyData = SkyManager.getStarData();
+        }
+
+        const data = {
+            item: totalItemCount,
+            star: totalStarCount,
+            sky: skyData
+        };
+
+        try {
+            localStorage.setItem(this.SAVE_KEY, JSON.stringify(data));
+            console.log("Game Saved.");
+        } catch(e) {
+            console.error("Save Failed:", e);
+        }
+    },
+
+    load: function() {
+        const json = localStorage.getItem(this.SAVE_KEY);
+        if (json) {
+            try {
+                const data = JSON.parse(json);
+                if (data.item !== undefined) totalItemCount = data.item;
+                if (data.star !== undefined) totalStarCount = data.star;
+                
+                // 星空データの復元
+                if (data.sky && typeof SkyManager !== 'undefined') {
+                    SkyManager.setStarData(data.sky);
+                }
+                
+                console.log("Game Loaded.", data);
+                updateScoreDisplay();
+            } catch(e) {
+                console.error("Load Failed:", e);
+            }
+        }
+    },
+
+    // リセット実行
+    resetData: function() {
+        localStorage.removeItem(this.SAVE_KEY);
+        location.reload();
+    },
+
+    // UI操作
+    showResetModal: function() {
+        const m = document.getElementById('screen-reset-confirm');
+        if(m) m.style.display = 'flex';
+    },
+    
+    hideResetModal: function() {
+        const m = document.getElementById('screen-reset-confirm');
+        if(m) m.style.display = 'none';
+    }
+};
+
+/**
  * --- 初期化処理 ---
  */
 window.onload = () => {
@@ -63,17 +129,37 @@ window.onload = () => {
 
     document.getElementById('file-input').addEventListener('change', manualLoadMap);
 
+    // ★修正: リセットボタンイベント (存在確認を追加してエラー回避)
+    const btnSettings = document.getElementById('btn-settings');
+    if (btnSettings) {
+        btnSettings.addEventListener('click', () => {
+            DataManager.showResetModal();
+        });
+    }
+    
+    const btnResetYes = document.getElementById('btn-reset-yes');
+    if (btnResetYes) {
+        btnResetYes.addEventListener('click', () => {
+            DataManager.resetData();
+        });
+    }
+
+    const btnResetNo = document.getElementById('btn-reset-no');
+    if (btnResetNo) {
+        btnResetNo.addEventListener('click', () => {
+            DataManager.hideResetModal();
+        });
+    }
+
     setupControls();
     window.addEventListener('resize', fitWindow);
 
     // デバッグ機能 (iPad等の入力モード対策のため e.code で判定)
     window.addEventListener('keydown', (e) => {
-        // hキー: 素材増加
         if (e.code === 'KeyH') {
             totalItemCount += 5;
             updateScoreDisplay();
         }
-        // sキー: 星増加 (デバッグ用)
         if (e.code === 'KeyS') {
             totalStarCount += 10;
             updateScoreDisplay();
@@ -107,10 +193,13 @@ window.onload = () => {
             console.log("chart.jsonが見つかりませんでした (ランダム生成モード)");
         });
 
-    // SkyManagerの初期化 (ほしを見る機能用)
+    // SkyManagerの初期化
     if (typeof SkyManager !== 'undefined') {
         SkyManager.init();
     }
+
+    // ★データロード
+    DataManager.load();
 };
 
 function tryAutoLoad() {
@@ -136,7 +225,6 @@ function manualLoadMap(e) {
 function updateScoreDisplay() {
     const st = document.getElementById('score-text');
     if (st) {
-        // 現在所持数 = ステージ内(score) + 持ち越し(totalItemCount)
         st.textContent = totalItemCount + score;
     }
     const starText = document.getElementById('star-text');
@@ -990,6 +1078,8 @@ window.resetGame = function () {
 
 window.goToAtelier = function () {
     document.getElementById('screen-clear').style.display = 'none';
+    // ★追加: セーブ実行
+    DataManager.save();
     loadStage(ATELIER_MAP_SRC, true);
 };
 
@@ -1018,6 +1108,11 @@ window.loadStage = function (url, isAtelier = false) {
     totalItemCount += score;
     score = 0;
     isAtelierMode = isAtelier;
+
+    // ★追加: アトリエの場合セーブ実行 (さがすから戻った時など)
+    if (isAtelierMode) {
+        DataManager.save();
+    }
 
     if (typeof AudioSys !== 'undefined' && !AudioSys.isMuted) {
         const bgmName = isAtelier ? 'atelier' : 'forest';
@@ -1124,6 +1219,9 @@ window.resetGameFromCraft = function (starRewardAmount) {
     player.cooldown = 30;
 
     updateCamera();
+
+    // ★追加: セーブ実行 (つくる、うちあげ終了時)
+    DataManager.save();
 
     if (gameLoopId) cancelAnimationFrame(gameLoopId);
     gameLoopId = requestAnimationFrame(gameLoop);
