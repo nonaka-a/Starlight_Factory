@@ -244,10 +244,16 @@ const SkyManager = {
     },
 
     drawSingleStamp: function (ctx, x, y, row, col, color, scale, record) {
-        // ★重要: 新規描画時のみリストに追加
         if (record) {
+            // ★修正: 保存データを軽量化
+            // 座標は整数に丸める、スケールは小数点第2位までにする
             this.starDataList.push({
-                x: x, y: y, row: row, col: col, color: color, scale: scale
+                x: Math.floor(x), 
+                y: Math.floor(y), 
+                row: row, 
+                col: col, 
+                color: color, 
+                scale: parseFloat(scale.toFixed(2))
             });
         }
 
@@ -274,7 +280,7 @@ const SkyManager = {
 
         if (this.useShadow) {
             ctx.shadowColor = color;
-            ctx.shadowBlur = 15 * this.resolutionScale; 
+            ctx.shadowBlur = 15 * this.resolutionScale * 0.8; 
         }
 
         ctx.globalAlpha = 1.0;
