@@ -113,7 +113,7 @@ const CraftFiring = {
     animFrameTimer: 0, // 全体のアニメーションフレームカウンタ
     doorAnimFrame: 0,  // 0(閉)～10(開)の11段階
     doorStateIndex: 0, // 0:閉, 1:半, 2:開 (画像切り替え用)
-    
+
     // ★追加: 5個の星の個別パラメータ {ox, oy, rot, flip, baseScale}
     starPieces: [],
 
@@ -152,7 +152,7 @@ const CraftFiring = {
     },
 
     end: function () {
-        AudioSys.stopBGM();
+        // AudioSys.stopBGM(); // クラフト4まで継続させるためコメントアウト
         if (this.fireSoundSource) {
             try { this.fireSoundSource.stop(); } catch (e) { }
             this.fireSoundSource = null;
@@ -439,7 +439,7 @@ const CraftFiring = {
             // 5. 右手前
             { ox: 60, oy: 45, rot: -0.1, flip: 1, baseScale: 0.78 }
         ];
-        
+
         // 念のため描画順（Y座標昇順）でソート
         this.starPieces.sort((a, b) => a.oy - b.oy);
     },
@@ -534,13 +534,13 @@ const CraftFiring = {
 
             // 5個の星を順番に描画
             if (this.starPieces.length > 0) {
-                for(const piece of this.starPieces) {
+                for (const piece of this.starPieces) {
                     const px = bakeCx + piece.ox;
                     const py = bakeCy + piece.oy;
-                    
+
                     // starSize (低温縮小ペナルティ) も適用
-                    const size = 150 * piece.baseScale * this.starSize; 
-                    
+                    const size = 150 * piece.baseScale * this.starSize;
+
                     ctx.save();
                     ctx.translate(px, py);
                     ctx.rotate(piece.rot);
@@ -560,7 +560,7 @@ const CraftFiring = {
                         ctx.drawImage(currentImg, -size / 2, -size / 2, size, size);
                         ctx.restore();
                     }
-                    
+
                     ctx.restore();
                 }
             } else {

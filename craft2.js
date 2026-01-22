@@ -136,6 +136,15 @@ const CraftMolding = {
         this.externalChart = data;
     },
 
+    reset: function () {
+        this.notes = [];
+        this.stats = { perfect: 0, good: 0 };
+        this.feedback = { type: null, timer: 0 };
+        this.isStarted = false;
+        this.isFinished = false;
+        this.nextNoteIndex = 0;
+    },
+
     end: function () {
         AudioSys.stopBGM();
         this.isStarted = false;

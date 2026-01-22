@@ -79,6 +79,10 @@ const CraftManager = {
 
         this.resetNextBtn();
         this.ui.btnNext.visible = false;
+        this.ui.btnNext.text = "つぎへ！";
+
+        if (typeof CraftMolding !== 'undefined') CraftMolding.reset?.();
+        if (typeof CraftPolishing !== 'undefined') CraftPolishing.reset?.();
 
         const ui = document.getElementById('ui-container');
         if (ui) ui.style.display = 'none';
@@ -370,6 +374,8 @@ const CraftManager = {
         let shadowColor = '#36b0a8'; // デフォルト (青緑系)
         if (color === '#ff6b6b') {
             shadowColor = '#d64545'; // 赤系
+        } else if (color === '#9c27b0') {
+            shadowColor = '#7b1fa2'; // 紫系
         }
 
         // 影を先に描画
@@ -440,13 +446,9 @@ const CraftManager = {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.font = "900 48px 'M PLUS Rounded 1c', sans-serif";
-        ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
-        ctx.shadowBlur = 10;
-        ctx.shadowOffsetY = 4;
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = 8;
         ctx.strokeText(text, cx, 60);
-        ctx.shadowColor = "transparent";
         ctx.fillStyle = '#ff6b6b';
         ctx.fillText(text, cx, 60);
         ctx.restore();
