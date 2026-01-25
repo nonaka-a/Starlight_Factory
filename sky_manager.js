@@ -148,14 +148,14 @@ const SkyManager = {
     },
 
     // --- 描画ロジック ---
-    drawCluster: function (gridX, gridY, sizeLevel, color) {
+    drawCluster: function (gridX, gridY, sizeLevel, color, targetCtx = null) {
         if (!this.isLoaded) return;
 
         let radius = 1;
         if (sizeLevel === 1) radius = 2;
         if (sizeLevel === 2) radius = 4;
 
-        const ctx = this.ctx;
+        const ctx = targetCtx || this.ctx;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
 

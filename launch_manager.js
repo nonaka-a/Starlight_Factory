@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------
-   FILE: launch_manager.js (Image Assets Ver.)
+   FILE: launch_manager.js (Image Assets Ver.) - Single Draw Call
    ------------------------------------------------------------ */
 
 /**
@@ -11,15 +11,23 @@ const LaunchImages = {
 
     bg: new Image(),
     cardBg: new Image(),
+    bgPrepare: new Image(),
 
-    // 星玉 (Base: 影や枠 / Mask: 色を塗る部分)
+    // 星玉
     balls: {
-        base: [], // [s, m, l]
-        mask: []  // [s, m, l]
+        base: [],
+        mask: []
     },
 
     // 色選択ボタン
-    colorBtns: {}, // '#ffffff': img, ...
+    colorBtns: {},
+
+    // 各種アニメ
+    launchPad: [],
+    starRise: [],
+    fireworks: {
+        s: [], m: [], l: []
+    },
 
     load: function () {
         if (this.loaded) return;
@@ -29,10 +37,14 @@ const LaunchImages = {
         };
 
         setSrc(this.bg, 'bg_launch.png');
+        setSrc(this.bgPrepare, 'bg_launch_prepare.png');
         setSrc(this.cardBg, 'card_bg.png');
 
         // 星玉画像 (0:S, 1:M, 2:L)
         const sizes = ['s', 'm', 'l'];
+        this.balls.base = [];
+        this.balls.mask = [];
+
         for (let i = 0; i < 3; i++) {
             const b = new Image();
             setSrc(b, `ball_base_${sizes[i]}.png`);
@@ -58,6 +70,32 @@ const LaunchImages = {
             this.colorBtns[c.code] = img;
         });
 
+        // 発射台 (1-7)
+        this.launchPad = [];
+        for (let i = 1; i <= 7; i++) {
+            const img = new Image();
+            setSrc(img, `launch_pad_0${i}.png`);
+            this.launchPad.push(img);
+        }
+
+        // 上昇アニメ (1-3)
+        this.starRise = [];
+        for (let i = 1; i <= 3; i++) {
+            const img = new Image();
+            setSrc(img, `star_rise_0${i}.png`);
+            this.starRise.push(img);
+        }
+
+        // 花火 (S/M/L, 1-6)
+        ['s', 'm', 'l'].forEach(size => {
+            this.fireworks[size] = [];
+            for (let i = 1; i <= 6; i++) {
+                const img = new Image();
+                setSrc(img, `firework_${size}_0${i}.png`);
+                this.fireworks[size].push(img);
+            }
+        });
+
         this.loaded = true;
     }
 };
@@ -67,7 +105,7 @@ const LaunchImages = {
  */
 const LaunchManager = {
     isActive: false,
-    state: 'select_type', // select_type, select_pos, animation
+    state: 'select_type', // select_type, launch_pad_anim, select_pos, animation
 
     // 選択データ
     stockList: [],
@@ -105,10 +143,20 @@ const LaunchManager = {
     launchIndex: 0,
     launchedItems: [],
 
+    // フラッシュ演出用
+    flashAlpha: 0,
+    hasDrawnStar: false,
+
     start: function () {
         LaunchImages.load();
         if (typeof SkyManager === 'undefined' || !SkyManager.isLoaded) {
             SkyManager.init();
+        }
+
+        // SEロード
+        if (typeof AudioSys !== 'undefined') {
+            AudioSys.loadBGM('se_launch', 'sounds/firework_launch.mp3');
+            AudioSys.loadBGM('se_firework', 'sounds/firework.mp3');
         }
 
         // うちあげ時はズームアウト
@@ -129,6 +177,8 @@ const LaunchManager = {
         this.state = 'select_type';
         this.stockList = [];
         this.selectedColor = '#ffffff';
+        this.launchedItems = [];
+        this.flashAlpha = 0;
 
         const visibleW = 1000 / SkyManager.viewScale;
         const visibleH = 600 / SkyManager.viewScale;
@@ -173,15 +223,23 @@ const LaunchManager = {
     },
 
     update: function () {
-        if (this.state !== 'animation') {
+        // アニメーション中はキャンセル不可
+        if (this.state !== 'animation' && this.state !== 'launch_pad_anim') {
             if (this.checkBtn(this.ui.btnCancel)) {
                 this.stop();
                 return;
             }
         }
 
+        // フラッシュフェードアウト
+        if (this.flashAlpha > 0) {
+            this.flashAlpha = Math.max(0, this.flashAlpha - 0.05); // 約20フレームで消える
+        }
+
         if (this.state === 'select_type') {
             this.updateSelectType();
+        } else if (this.state === 'launch_pad_anim') {
+            this.updateLaunchPadAnim();
         } else if (this.state === 'select_pos') {
             this.updateSelectPos();
         } else if (this.state === 'animation') {
@@ -261,13 +319,12 @@ const LaunchManager = {
 
             // うちあげボタン
             if (placedItems.length > 0 && this.checkBtn(this.ui.btnLaunch)) {
-                this.startAnimation();
+                this.startLaunchPadAnim();
                 return;
             }
 
             // 1つもどるボタン (配置済みを1つキャンセル)
             if (placedItems.length > 0 && this.checkBtn(this.ui.btnBack)) {
-                // 最後に配置したものを探す
                 const lastPlaced = [...this.stockList].reverse().find(it => it.placed);
                 if (lastPlaced) {
                     lastPlaced.placed = false;
@@ -288,6 +345,37 @@ const LaunchManager = {
         }
     },
 
+    // --- 発射台アニメーション (地上) ---
+    startLaunchPadAnim: function () {
+        this.state = 'launch_pad_anim';
+        this.animTimer = 0;
+        this.launchIndex = 0;
+        this.launchedItems = this.stockList.filter(it => it.placed);
+    },
+
+    updateLaunchPadAnim: function () {
+        this.animTimer++;
+
+        const frameDur = 5;
+        const totalFrames = 7;
+        const oneShotDur = frameDur * totalFrames;
+
+        const currentShotTime = this.animTimer % Math.ceil(oneShotDur);
+
+        if (currentShotTime === 0 && this.launchIndex < this.launchedItems.length) {
+            AudioSys.playSE('se_launch', 0.6);
+        }
+
+        if (this.animTimer >= Math.ceil(oneShotDur)) {
+            this.animTimer = 0;
+            this.launchIndex++;
+        }
+
+        if (this.launchIndex >= this.launchedItems.length) {
+            this.startAnimation();
+        }
+    },
+
     clampCamera: function () {
         const visibleW = 1000 / SkyManager.viewScale;
         const visibleH = 600 / SkyManager.viewScale;
@@ -303,31 +391,69 @@ const LaunchManager = {
         this.state = 'animation';
         this.animTimer = 0;
         this.launchIndex = 0;
-        this.launchedItems = this.stockList.filter(it => it.placed);
+        // launchedItems は startLaunchPadAnim で生成済みなのでそのまま使用
+
+        this.animPhase = 0; // 0:Init, 1:Rise, 2:Explode
+        this.animY = 0;
+        this.hasDrawnStar = false;
+        this.flashAlpha = 0;
     },
 
     updateAnimation: function () {
-        this.animTimer++;
         const currentItem = this.launchedItems[this.launchIndex];
         if (!currentItem) {
-            if (this.animTimer > 120) {
+            this.animTimer++;
+            if (this.animTimer > 60) {
                 this.stop();
             }
             return;
         }
 
-        const phase = this.animTimer % 100;
-        if (phase === 0) {
-            AudioSys.playTone(300, 'square', 0.1);
+        const targetX = (currentItem.gx * SkyManager.gridSize);
+        const targetY = (currentItem.gy * SkyManager.gridSize);
+
+        // フェーズ0: 初期化
+        if (this.animPhase === 0) {
+            const visibleH = 600 / SkyManager.viewScale;
+            this.animY = this.camera.y + visibleH + 100;
+            this.animPhase = 1;
+            this.hasDrawnStar = false;
         }
-        if (phase === 60) {
-            AudioSys.playTone(100, 'noise', 0.5);
-            SkyManager.drawCluster(currentItem.gx, currentItem.gy, currentItem.size, currentItem.color);
+
+        // フェーズ1: 上昇
+        if (this.animPhase === 1) {
+            const speed = 15;
+            this.animY -= speed;
+
+            // 目標到達
+            if (this.animY <= targetY) {
+                this.animY = targetY;
+                this.animPhase = 2;
+                this.animSubTimer = 0;
+            }
         }
-        if (phase === 99) {
-            this.launchIndex++;
-            if (this.launchIndex >= this.launchedItems.length) {
-                this.animTimer = 0;
+
+        // フェーズ2: 爆発（花火）
+        if (this.animPhase === 2) {
+            this.animSubTimer++;
+            const frameDur = 7.5;
+            const totalFrames = 6;
+
+            // 花火開始から約0.13秒後 (2フレーム目開始時)
+            if (!this.hasDrawnStar && this.animSubTimer >= frameDur * 1) {
+                // 1回呼び出しに戻す（SkyManager側で生成量を調整済み）
+                SkyManager.drawCluster(currentItem.gx, currentItem.gy, currentItem.size, currentItem.color);
+                
+                this.hasDrawnStar = true;
+                this.flashAlpha = 0.8;
+                AudioSys.playSE('se_firework', 0.7);
+            }
+
+            // 花火アニメ終了
+            if (this.animSubTimer >= frameDur * totalFrames) {
+                // 次へ
+                this.launchIndex++;
+                this.animPhase = 0;
             }
         }
     },
@@ -337,16 +463,23 @@ const LaunchManager = {
 
         if (this.state === 'select_type') {
             this.drawSelectType(ctx);
+        } else if (this.state === 'launch_pad_anim') {
+            this.drawLaunchPadAnim(ctx);
         } else if (this.state === 'select_pos' || this.state === 'animation') {
             this.drawMapMode(ctx);
         }
 
-        if (this.state !== 'animation') {
+        // フラッシュエフェクト描画 (全ステート共通で上書き)
+        if (this.flashAlpha > 0) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${this.flashAlpha})`;
+            ctx.fillRect(0, 0, 1000, 600);
+        }
+
+        if (this.state !== 'animation' && this.state !== 'launch_pad_anim') {
             this.drawBtn(ctx, this.ui.btnCancel, '#ff6b6b');
         }
     },
 
-    // 色付きの星玉画像を生成して描画するヘルパー
     drawTintedBall: function (ctx, x, y, sizeIndex, color, w, h) {
         if (!this.tintCtx) return;
 
@@ -356,33 +489,20 @@ const LaunchManager = {
         if (!maskImg || !baseImg) return;
         if (!maskImg.complete || !baseImg.complete) return;
 
-        // 一時キャンバスで色合成
         this.tintCtx.clearRect(0, 0, w, h);
-
-        // 1. マスクを描画
         this.tintCtx.drawImage(maskImg, 0, 0, w, h);
 
-        // 2. 色を塗りつぶし (source-in: 描画されている部分だけ色が残る)
         this.tintCtx.globalCompositeOperation = 'source-in';
         this.tintCtx.fillStyle = color;
         this.tintCtx.fillRect(0, 0, w, h);
 
-        // 3. 合成モードを戻す
         this.tintCtx.globalCompositeOperation = 'source-over';
 
-        // 4. ベース画像を下に敷く、または上に重ねる
-        // ここでは「マスク部分に着色して、ベース(影など)を重ねる」想定
-        // もしベースが不透明なら順序逆。通常ベースは乗算や半透明影を含む透過PNGと想定。
-
-        // メインキャンバスに描画
-        // 1. ベース画像(本体素材など)を先に描画
         ctx.drawImage(baseImg, x, y, w, h);
-        // 2. その上から色付き部分を重ねて描画
         ctx.drawImage(this.tintCanvas, 0, 0, w, h, x, y, w, h);
     },
 
     drawSelectType: function (ctx) {
-        // 背景画像
         if (LaunchImages.bg.complete) {
             ctx.drawImage(LaunchImages.bg, 0, 0, 1000, 600);
         } else {
@@ -390,7 +510,6 @@ const LaunchManager = {
             ctx.fillRect(0, 0, 1000, 600);
         }
 
-        // タイトル
         ctx.save();
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -407,11 +526,9 @@ const LaunchManager = {
         ctx.font = "bold 20px 'M PLUS Rounded 1c', sans-serif";
         ctx.fillText("うちあげたい星玉をえらんで　おっけーを押そう", 500, 135);
 
-        // カード描画
         this.ui.sizes.forEach((b, i) => {
             const canBuy = (totalStarCount >= b.cost);
 
-            // カード背景
             if (LaunchImages.cardBg.complete) {
                 if (!canBuy) ctx.globalAlpha = 0.5;
                 const cardScale = 1.05;
@@ -431,24 +548,19 @@ const LaunchManager = {
                 ctx.stroke();
             }
 
-            // テキスト
             ctx.fillStyle = canBuy ? '#5d4037' : '#888';
             ctx.font = "bold 32px 'M PLUS Rounded 1c', sans-serif";
             ctx.fillText(b.label, b.x + b.w / 2, b.y + 35);
             ctx.font = "bold 24px 'M PLUS Rounded 1c', sans-serif";
             ctx.fillText(`星 ${b.cost}個`, b.x + b.w / 2, b.y + 175);
 
-            // 星玉画像描画 (色反映)
-            // 画像サイズ 140x140 を想定
             const ballSize = 140;
             const bx = b.x + b.w / 2 - ballSize / 2;
-            const by = b.y + 105 - ballSize / 2; // 中心位置(105)に合わせて配置
+            const by = b.y + 105 - ballSize / 2;
 
-            // 選択中の色で描画
             this.drawTintedBall(ctx, bx, by, i, this.selectedColor, ballSize, ballSize);
         });
 
-        // 色ボタン描画
         this.ui.colors.forEach((c) => {
             const btnImg = LaunchImages.colorBtns[c.code];
             const size = 64;
@@ -458,16 +570,12 @@ const LaunchManager = {
             if (btnImg && btnImg.complete) {
                 ctx.drawImage(btnImg, cx, cy, size, size);
             } else {
-                // 画像がない場合のフォールバック
                 ctx.fillStyle = c.code;
                 ctx.beginPath();
                 ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
                 ctx.fill();
             }
 
-            // 選択中の枠線 (画像がない場合や、強調として)
-            // ★要望:「白い枠線」は無しで良いとのことだが、選択状態がわかるように
-            // 選択されている色は少し大きく表示する等の演出を入れる
             if (this.selectedColor === c.code) {
                 ctx.fillStyle = '#fff';
                 ctx.beginPath();
@@ -483,6 +591,35 @@ const LaunchManager = {
         if (this.stockList.length > 0) {
             this.drawBtn(ctx, this.ui.btnOk, '#4ecdc4');
             this.drawBtn(ctx, this.ui.btnBack, '#ffaa00');
+        }
+    },
+
+    drawLaunchPadAnim: function (ctx) {
+        const bg = LaunchImages.bgPrepare.complete ? LaunchImages.bgPrepare : LaunchImages.bg;
+        if (bg.complete) {
+            ctx.drawImage(bg, 0, 0, 1000, 600);
+        } else {
+            ctx.fillStyle = '#111';
+            ctx.fillRect(0, 0, 1000, 600);
+        }
+
+        const padImgs = LaunchImages.launchPad;
+        if (padImgs.length > 0) {
+            let frameIndex = 0;
+            if (this.launchIndex < this.launchedItems.length) {
+                const frameDur = 5;
+                const totalFrames = 7;
+                const animTime = this.animTimer % Math.ceil(frameDur * totalFrames);
+                frameIndex = Math.floor(animTime / frameDur);
+                if (frameIndex >= padImgs.length) frameIndex = padImgs.length - 1;
+            } else {
+                frameIndex = 0;
+            }
+
+            const img = padImgs[frameIndex];
+            if (img && img.complete) {
+                ctx.drawImage(img, 100, 0, 800, 600);
+            }
         }
     },
 
@@ -502,10 +639,7 @@ const LaunchManager = {
         let iconY = ly + 80;
         for (let i = 0; i < this.stockList.length; i++) {
             const item = this.stockList[i];
-
-            // アイコンとして小さく描画 (72x72)
             const iconSize = 72;
-            // 描画位置調整
             this.drawTintedBall(ctx, iconX - iconSize / 2, iconY - iconSize / 2, item.size, item.color, iconSize, iconSize);
 
             iconX += 50;
@@ -517,7 +651,6 @@ const LaunchManager = {
         }
     },
 
-    // マップモードとアニメーション描画は既存のまま (画像化の影響なし)
     drawMapMode: function (ctx) {
         if (SkyManager.canvas) {
             const sScale = SkyManager.resolutionScale;
@@ -620,29 +753,40 @@ const LaunchManager = {
         const currentItem = this.launchedItems[this.launchIndex];
         if (!currentItem) return;
 
-        const phase = this.animTimer % 100;
-        const tx = (currentItem.gx * SkyManager.gridSize - this.camera.x + 16) * SkyManager.viewScale;
-        const ty = (currentItem.gy * SkyManager.gridSize - this.camera.y + 16) * SkyManager.viewScale;
-        const sy = 600;
+        if (this.animPhase === 1) {
+            const tx = (currentItem.gx * SkyManager.gridSize - this.camera.x + SkyManager.gridSize / 2) * SkyManager.viewScale;
+            const vy = (this.animY - this.camera.y) * SkyManager.viewScale;
 
-        if (phase < 60) {
-            const t = phase / 60;
-            const cy = sy + (ty - sy) * t;
-            ctx.fillStyle = '#fff';
-            ctx.beginPath();
-            ctx.arc(tx, cy, 5, 0, Math.PI * 2);
-            ctx.fill();
+            const riseImgs = LaunchImages.starRise;
+            if (riseImgs.length > 0) {
+                const frameIndex = Math.floor((Date.now() / 1000 * 12) % 3);
+                const img = riseImgs[frameIndex];
 
-            ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(tx, cy);
-            ctx.lineTo(tx, cy + 20);
-            ctx.stroke();
-        } else if (phase < 80) {
-            const alpha = 1 - (phase - 60) / 20;
-            ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-            ctx.fillRect(0, 0, 1000, 600);
+                if (img && img.complete) {
+                    const w = img.naturalWidth;
+                    const h = img.naturalHeight;
+                    ctx.drawImage(img, tx - w / 2, vy - h / 2);
+                }
+            }
+        } else if (this.animPhase === 2) {
+            const tx = (currentItem.gx * SkyManager.gridSize - this.camera.x + SkyManager.gridSize / 2) * SkyManager.viewScale;
+            const ty = (currentItem.gy * SkyManager.gridSize - this.camera.y + SkyManager.gridSize / 2) * SkyManager.viewScale;
+
+            const sizeKey = ['s', 'm', 'l'][currentItem.size];
+            const fwImgs = LaunchImages.fireworks[sizeKey];
+
+            if (fwImgs && fwImgs.length > 0) {
+                const frameDur = 7.5;
+                let frameIndex = Math.floor(this.animSubTimer / frameDur);
+                if (frameIndex >= fwImgs.length) frameIndex = fwImgs.length - 1;
+
+                const img = fwImgs[frameIndex];
+                if (img && img.complete) {
+                    const w = img.naturalWidth * 0.5;
+                    const h = img.naturalHeight * 0.5;
+                    ctx.drawImage(img, tx - w / 2, ty - h / 2, w, h);
+                }
+            }
         }
     },
 

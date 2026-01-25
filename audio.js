@@ -66,6 +66,13 @@ const AudioSys = {
 
     playTone: function (freq, type, duration, vol = 0.1) {
         if (!this.ctx) return;
+
+        // 'noise' タイプは Oscillator に存在しないため専用関数へ委譲
+        if (type === 'noise') {
+            this.playNoise(duration, vol);
+            return;
+        }
+
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = type;

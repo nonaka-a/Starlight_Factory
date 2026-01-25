@@ -51,7 +51,7 @@ let score = 0; // 現在のステージ内での「ほしのもと」取得数
 const DataManager = {
     SAVE_KEY: 'hoshizora_save_v1',
 
-    save: function() {
+    save: function () {
         // SkyManagerから星データ取得
         let skyData = [];
         if (typeof SkyManager !== 'undefined' && SkyManager.getStarData) {
@@ -67,47 +67,50 @@ const DataManager = {
         try {
             localStorage.setItem(this.SAVE_KEY, JSON.stringify(data));
             console.log("Game Saved.");
-        } catch(e) {
+        } catch (e) {
             console.error("Save Failed:", e);
         }
     },
 
-    load: function() {
+    load: function () {
         const json = localStorage.getItem(this.SAVE_KEY);
         if (json) {
             try {
                 const data = JSON.parse(json);
                 if (data.item !== undefined) totalItemCount = data.item;
                 if (data.star !== undefined) totalStarCount = data.star;
-                
+
                 // 星空データの復元
                 if (data.sky && typeof SkyManager !== 'undefined') {
                     SkyManager.setStarData(data.sky);
                 }
-                
+
                 console.log("Game Loaded.", data);
                 updateScoreDisplay();
-            } catch(e) {
+            } catch (e) {
                 console.error("Load Failed:", e);
             }
         }
     },
 
     // リセット実行
-    resetData: function() {
+    resetData: function () {
         localStorage.removeItem(this.SAVE_KEY);
+        if (typeof SkyManager !== 'undefined') {
+            SkyManager.setStarData([]);
+        }
         location.reload();
     },
 
     // UI操作
-    showResetModal: function() {
+    showResetModal: function () {
         const m = document.getElementById('screen-reset-confirm');
-        if(m) m.style.display = 'flex';
+        if (m) m.style.display = 'flex';
     },
-    
-    hideResetModal: function() {
+
+    hideResetModal: function () {
         const m = document.getElementById('screen-reset-confirm');
-        if(m) m.style.display = 'none';
+        if (m) m.style.display = 'none';
     }
 };
 
@@ -135,7 +138,7 @@ window.onload = () => {
             DataManager.showResetModal();
         });
     }
-    
+
     const btnResetYes = document.getElementById('btn-reset-yes');
     if (btnResetYes) {
         btnResetYes.addEventListener('click', () => {
@@ -971,7 +974,7 @@ function checkTileAt(x, y) {
             startCraftMode();
             return;
         }
-        
+
         // ★追加: うちあげ (ID: 114)
         if (cell.id === 114) {
             if (typeof LaunchManager !== 'undefined') {
