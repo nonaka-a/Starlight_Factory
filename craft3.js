@@ -153,6 +153,7 @@ const CraftFiring = {
 
     end: function () {
         // AudioSys.stopBGM(); // クラフト4まで継続させるためコメントアウト
+        this.firePower = 0; // 強制的に火力を0にして音のループを止める
         if (this.fireSoundSource) {
             try { this.fireSoundSource.stop(); } catch (e) { }
             this.fireSoundSource = null;

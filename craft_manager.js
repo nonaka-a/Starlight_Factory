@@ -80,6 +80,7 @@ const CraftManager = {
         this.resetNextBtn();
         this.ui.btnNext.visible = false;
         this.ui.btnNext.text = "つぎへ！";
+        this.ui.btnCancel.visible = true; // ★追加: 二回目以降に消えないように明示的に表示設定する
 
         if (typeof CraftMolding !== 'undefined') CraftMolding.reset?.();
         if (typeof CraftPolishing !== 'undefined') CraftPolishing.reset?.();
@@ -328,6 +329,17 @@ const CraftManager = {
     },
 
     forceCancelCraft: function () {
+        // 現在の工程の終了処理を呼んで音などを止める
+        if (this.state === 'firing' && typeof CraftFiring !== 'undefined' && CraftFiring.end) {
+            CraftFiring.end();
+        } else if (this.state === 'mixing' || this.state === 'pouring' || this.state === 'select') {
+            if (typeof CraftMixing !== 'undefined' && CraftMixing.end) CraftMixing.end();
+        } else if (this.state === 'molding' && typeof CraftMolding !== 'undefined' && CraftMolding.end) {
+            CraftMolding.end();
+        } else if (this.state === 'polishing' && typeof CraftPolishing !== 'undefined' && CraftPolishing.end) {
+            CraftPolishing.end();
+        }
+
         this.showConfirm = false;
         this.isActive = false;
 
