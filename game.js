@@ -380,6 +380,12 @@ function setupTouchControls() {
         btn.addEventListener('touchstart', down, { passive: false });
         btn.addEventListener('touchend', up, { passive: false });
         btn.addEventListener('touchcancel', up, { passive: false });
+        btn.addEventListener('touchmove', (e) => {
+            if (e.cancelable) e.preventDefault();
+        }, { passive: false });
+        btn.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+        });
 
         btn.addEventListener('mousedown', (e) => {
             if (e.button !== 0) return;
@@ -399,6 +405,21 @@ function setupTouchControls() {
     bindTouch('btn-down', 'ArrowDown');
     bindTouch('btn-jump', 'Space');
     bindTouch('btn-attack', 'KeyB');
+
+    const uiContainer = document.getElementById('ui-container');
+    if (uiContainer) {
+        uiContainer.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 1) {
+                // マルチタッチは許可するが、ブラウザのズーム等は抑制
+                if (e.cancelable) e.preventDefault();
+            }
+        }, { passive: false });
+
+        uiContainer.addEventListener('touchmove', (e) => {
+            // UIエリア内でのスクロールを完全に禁止
+            if (e.cancelable) e.preventDefault();
+        }, { passive: false });
+    }
 
     document.getElementById('btn-fullscreen')?.addEventListener('click', toggleFullScreen);
     document.getElementById('btn-mute')?.addEventListener('click', toggleMute);

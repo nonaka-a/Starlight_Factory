@@ -750,12 +750,12 @@
           },
           {
             "id": 14,
-            "rot": 180,
-            "fx": true,
+            "rot": 0,
+            "fx": false,
             "fy": false
           },
           {
-            "id": 22,
+            "id": 72,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -773,13 +773,13 @@
             "fy": false
           },
           {
-            "id": 80,
+            "id": 64,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 81,
+            "id": 64,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -791,19 +791,19 @@
             "fy": false
           },
           {
-            "id": 80,
+            "id": 14,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 81,
+            "id": 15,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 22,
+            "id": 72,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -833,19 +833,19 @@
             "fy": true
           },
           {
-            "id": 15,
-            "rot": 0,
-            "fx": false,
-            "fy": true
-          },
-          {
-            "id": 22,
+            "id": 64,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 22,
+            "id": 64,
+            "rot": 0,
+            "fx": false,
+            "fy": false
+          },
+          {
+            "id": 72,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -871,13 +871,13 @@
             "fy": false
           },
           {
-            "id": 23,
+            "id": 14,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 64,
+            "id": 72,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -895,8 +895,8 @@
             "fy": false
           },
           {
-            "id": 15,
-            "rot": 90,
+            "id": 64,
+            "rot": 0,
             "fx": false,
             "fy": false
           },
@@ -913,19 +913,19 @@
             "fy": false
           },
           {
-            "id": 14,
+            "id": 80,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 14,
-            "rot": 180,
-            "fx": true,
-            "fy": true
+            "id": 81,
+            "rot": 0,
+            "fx": false,
+            "fy": false
           },
           {
-            "id": 64,
+            "id": 72,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -937,15 +937,15 @@
             "fy": false
           },
           {
-            "id": 15,
+            "id": 80,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 15,
-            "rot": 90,
-            "fx": true,
+            "id": 81,
+            "rot": 0,
+            "fx": false,
             "fy": false
           },
           {
@@ -955,25 +955,25 @@
             "fy": true
           },
           {
-            "id": 15,
-            "rot": 0,
-            "fx": false,
-            "fy": true
-          },
-          {
-            "id": 15,
+            "id": 64,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 69,
+            "id": 64,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 70,
+            "id": 72,
+            "rot": 0,
+            "fx": false,
+            "fy": false
+          },
+          {
+            "id": 78,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -995,11 +995,11 @@
           {
             "id": 65,
             "rot": 0,
-            "fx": false,
+            "fx": true,
             "fy": false
           },
           {
-            "id": 65,
+            "id": 72,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -1035,7 +1035,7 @@
             "fy": false
           },
           {
-            "id": 68,
+            "id": 71,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -1047,10 +1047,10 @@
             "fy": false
           },
           {
-            "id": 15,
+            "id": 72,
             "rot": 0,
-            "fx": true,
-            "fy": true
+            "fx": false,
+            "fy": false
           },
           {
             "id": 68,
@@ -1089,13 +1089,13 @@
             "fy": false
           },
           {
-            "id": 68,
+            "id": 72,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 78,
+            "id": 71,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -1117,11 +1117,11 @@
           {
             "id": 73,
             "rot": 0,
-            "fx": false,
+            "fx": true,
             "fy": false
           },
           {
-            "id": 73,
+            "id": 72,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -1157,7 +1157,7 @@
             "fy": false
           },
           {
-            "id": 76,
+            "id": 79,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -1169,7 +1169,7 @@
             "fy": true
           },
           {
-            "id": 77,
+            "id": 72,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -1211,13 +1211,13 @@
             "fy": false
           },
           {
-            "id": 76,
+            "id": 72,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 77,
+            "id": 79,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -1644,13 +1644,13 @@
             "fy": false
           },
           {
-            "id": 9,
+            "id": 0,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 10,
+            "id": 0,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -1766,13 +1766,13 @@
             "fy": false
           },
           {
-            "id": 9,
+            "id": 5,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 10,
+            "id": 5,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -2236,25 +2236,25 @@
             "fy": false
           },
           {
-            "id": 0,
+            "id": 5,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 0,
+            "id": 5,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 0,
+            "id": 5,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 0,
+            "id": 5,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -2802,15 +2802,15 @@
             "fy": false
           },
           {
-            "id": 0,
+            "id": 108,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 0,
-            "rot": 90,
-            "fx": true,
+            "id": 108,
+            "rot": 0,
+            "fx": false,
             "fy": false
           },
           {
@@ -3235,13 +3235,13 @@
             "fy": false
           },
           {
-            "id": 0,
+            "id": 9,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 0,
+            "id": 10,
             "rot": 0,
             "fx": false,
             "fy": false
@@ -3357,13 +3357,13 @@
             "fy": false
           },
           {
-            "id": 0,
+            "id": 9,
             "rot": 0,
             "fx": false,
             "fy": false
           },
           {
-            "id": 0,
+            "id": 10,
             "rot": 0,
             "fx": false,
             "fy": false

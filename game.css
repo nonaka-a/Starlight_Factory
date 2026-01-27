@@ -10,6 +10,8 @@ body {
     position: fixed;
     user-select: none;
     -webkit-user-select: none;
+    overscroll-behavior: none;
+    /* iPadでのスクロール・バウンスによる中断防止 */
     background-color: #222;
     color: #eee;
     display: flex;
@@ -18,6 +20,9 @@ body {
     justify-content: center;
     font-family: 'M PLUS Rounded 1c', sans-serif;
     touch-action: none;
+    /* iPadでの長押し中断対策 */
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 #main-wrapper {
@@ -74,6 +79,10 @@ canvas {
     gap: 10px;
     align-items: center;
     justify-items: center;
+    /* iPadでの不用意なジェスチャー防止 */
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .dpad-btn {
@@ -91,6 +100,9 @@ canvas {
     touch-action: none;
     box-shadow: 0 4px 0 #111;
     opacity: 0.9;
+    /* iPadでの長押し中断・青い選択枠防止 */
+    -webkit-user-callout: none;
+    -webkit-user-drag: none;
 }
 
 .dpad-btn:active,
