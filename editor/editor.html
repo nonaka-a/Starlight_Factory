@@ -151,6 +151,28 @@
             display: none;
         }
 
+        /* --- モーダル --- */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal {
+            background: #333;
+            padding: 20px;
+            border: 1px solid #555;
+            border-radius: 5px;
+            color: #fff;
+            text-align: center;
+        }
+
         /* --- マップエディタ用CSS --- */
         #main-area {
             display: flex;
@@ -471,6 +493,7 @@
 
     <!-- モード1: マップエディタ -->
     <div id="mode-map" class="mode-area active">
+        <!-- 省略せず全体を表示 -->
         <div id="toolbar">
             <div class="tool-group">
                 <input type="text" id="map-name" value="my_stage" placeholder="ファイル名">
@@ -521,7 +544,6 @@
 
         <div id="main-area">
             <div id="sidebar">
-                <!-- タイル設定エリア -->
                 <div id="tile-properties">
                     <div class="prop-item">
                         <label>ID</label>
@@ -538,15 +560,11 @@
                         <span>当たり判定 (Solid)</span>
                     </label>
                 </div>
-
-                <!-- タイルセット画像パレット -->
                 <div id="palette-container">
                     <canvas id="palette-canvas"></canvas>
                 </div>
-
                 <div id="brush-status">ブラシ回転: 0°</div>
             </div>
-
             <div id="viewport">
                 <div id="canvas-container">
                     <canvas id="editor-canvas"></canvas>
@@ -563,10 +581,7 @@
                 <button onclick="anim_create()">➕ 新規アニメ</button>
                 <label class="btn" for="anim-img-input" style="background:#559;">🖼️ 画像読込</label>
                 <input type="file" id="anim-img-input" accept="image/*" multiple onchange="anim_loadImages(this)">
-
-                <!-- 画像保存ボタン追加 -->
                 <button onclick="anim_saveImage()" style="background:#559;">🖼️ 画像保存</button>
-
                 <button onclick="anim_save()" style="background:#6a4;">💾 JSON保存</button>
                 <label class="btn" for="anim-file-input">📂 読込</label>
                 <input type="file" id="anim-file-input" accept=".json" onchange="anim_load(this)">
@@ -576,37 +591,25 @@
                 <span style="font-size:0.8rem; color:#aaa;">ソース画像: 連番画像を読込、またはクリックしてフレーム追加</span>
             </div>
         </div>
-
         <div class="anim-container">
-            <!-- 左: アニメーションリスト -->
             <div class="anim-sidebar">
                 <div class="prop-row" style="background:#444; font-weight:bold;">アニメ一覧</div>
-                <div id="anim-list" class="anim-list">
-                    <!-- JSで生成 -->
-                </div>
+                <div id="anim-list" class="anim-list"></div>
             </div>
-
-            <!-- 中央: ワークスペース -->
             <div class="anim-workspace">
                 <div class="anim-upper">
-                    <!-- ソース画像表示 -->
                     <div class="source-view">
                         <div id="source-container" style="display:inline-block; position:relative;">
                             <canvas id="anim-source-canvas"></canvas>
                         </div>
                     </div>
-
-                    <!-- プレビュー -->
                     <div class="preview-view">
                         <div style="margin-bottom:10px; color:#aaa; font-size:0.9rem;">プレビュー</div>
                         <canvas id="anim-preview-canvas" width="128" height="128"
                             style="background:#444; border:1px solid #666;"></canvas>
-
                         <div style="margin-top:10px; display:flex; gap:5px;">
-                            <!-- 再生/停止ボタン追加 -->
                             <button id="btn-anim-play" onclick="anim_togglePlay()" style="width:40px;">⏸</button>
                         </div>
-
                         <div class="prop-row"
                             style="margin-top:5px; width:100%; box-sizing:border-box; justify-content:center; flex-wrap:wrap;">
                             <span class="prop-label">名前:</span>
@@ -620,13 +623,9 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- タイムライン -->
                 <div class="timeline-view">
                     <div class="prop-row" style="padding:5px 10px; background:#444; font-size:0.8rem;">タイムライン</div>
-                    <div id="timeline-frames" class="timeline-frames">
-                        <!-- JSで生成 -->
-                    </div>
+                    <div id="timeline-frames" class="timeline-frames"></div>
                 </div>
             </div>
         </div>
@@ -650,7 +649,6 @@
                 <input type="number" id="chart-bpm" value="110" step="1" onchange="chart_draw()">
                 <label style="font-size:0.8rem; margin:0 5px; color:#aaa;">Offset:</label>
                 <input type="number" id="chart-offset" value="0.0" step="0.1" onchange="chart_draw()">
-                <!-- 修正: 秒数グリッド表示切替 -->
                 <label class="btn" style="margin-left:5px; font-size:0.8rem; padding:2px 5px;">
                     <input type="checkbox" id="chart-show-sec-grid" checked onchange="chart_draw()"> 秒数Grid
                 </label>
@@ -664,24 +662,20 @@
                 <button onclick="chart_clear()" class="danger">クリア</button>
             </div>
         </div>
-
         <div class="chart-info-panel">
             <span>Click: ノーツ選択・移動 / 空白Click: 再生位置変更 / Shift+Click: 新規ノーツ(Long) / 右Click: 青ノーツ</span>
             <span>Time: <span id="chart-time-display">0.00</span>s</span>
         </div>
-
         <div id="chart-workspace">
             <div class="chart-controls">
                 <span>Zoom:</span>
                 <input type="range" id="chart-zoom" min="20" max="300" value="100" oninput="chart_draw()">
-                
                 <span style="margin-left: 20px;">再生位置調整:</span>
                 <button onclick="chart_skip(-5)">⏪ -5s</button>
                 <button onclick="chart_skip(-1)">◀ -1s</button>
                 <button onclick="chart_skip(1)">▶ +1s</button>
                 <button onclick="chart_skip(5)">⏩ +5s</button>
             </div>
-
             <div id="chart-canvas-container">
                 <canvas id="chart-canvas"></canvas>
             </div>
@@ -697,6 +691,7 @@
             <div class="tool-group">
                 <button id="btn-event-play" onclick="event_togglePlay()">▶ 再生</button>
                 <button onclick="event_stop()">⏹ 停止</button>
+                <span id="event-comp-name-display" style="margin-left: 10px; font-weight: bold; color: #fff;"></span>
             </div>
             <div class="spacer"></div>
         </div>
@@ -704,10 +699,9 @@
         <div id="event-workspace" style="flex: 1; display: flex; flex-direction: column; gap: 0; overflow: hidden;">
             <!-- プレビュー画面 -->
             <div id="event-preview-container" style="height: 55%; min-height: 100px; background: #111; border: 1px solid #555; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                <!-- Canvas -->
                 <canvas id="event-preview-canvas" style="background: #000; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></canvas>
                 
-                <!-- 追加: プレビュー用ズームコントロール (左下) -->
+                <!-- プレビュー用ズームコントロール (左下) -->
                 <div style="position: absolute; bottom: 5px; left: 5px; background: rgba(0,0,0,0.7); padding: 5px; border-radius: 4px; display: flex; gap: 5px; align-items: center;">
                     <select id="event-preview-zoom-mode" onchange="event_updatePreviewZoomUI()" style="background:#333; color:#fff; border:1px solid #555; font-size:0.8rem;">
                         <option value="fit">Fit</option>
@@ -739,10 +733,9 @@
             </div>
         </div>
 
-        <!-- コンポジション設定モーダル (変更なし) -->
+        <!-- コンポジション設定モーダル -->
         <div id="event-comp-modal" class="overlay" style="display: none;">
-            <!-- ...中略... -->
-             <div class="modal" style="width: 300px;">
+            <div class="modal" style="width: 300px;">
                 <h2>コンポジション設定</h2>
                 <div style="display: flex; flex-direction: column; gap: 10px; text-align: left;">
                     <div><label style="font-size: 0.8rem;">名前</label><input type="text" id="inp-comp-name" style="width: 100%;"></div>
@@ -750,7 +743,10 @@
                         <div style="flex: 1;"><label style="font-size: 0.8rem;">幅 (px)</label><input type="number" id="inp-comp-w" style="width: 100%;"></div>
                         <div style="flex: 1;"><label style="font-size: 0.8rem;">高さ (px)</label><input type="number" id="inp-comp-h" style="width: 100%;"></div>
                     </div>
-                    <div><label style="font-size: 0.8rem;">尺 (秒)</label><input type="number" id="inp-comp-duration" style="width: 100%;"></div>
+                    <div style="display: flex; gap: 10px;">
+                        <div style="flex: 1;"><label style="font-size: 0.8rem;">尺 (秒)</label><input type="number" id="inp-comp-duration" style="width: 100%;"></div>
+                        <div style="flex: 1;"><label style="font-size: 0.8rem;">フレームレート</label><input type="number" id="inp-comp-fps" style="width: 100%;"></div>
+                    </div>
                 </div>
                 <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
                     <button class="danger" onclick="document.getElementById('event-comp-modal').style.display='none'">キャンセル</button>
@@ -778,10 +774,14 @@
         };
     </script>
 
-    <script src="editor_map.js"></script>
+   <script src="editor_map.js"></script>
     <script src="editor_anim.js"></script>
     <script src="editor_chart.js"></script>
-    <script src="editor_event.js"></script> <!-- 新規追加 -->
+    
+    <!-- 分割したイベントエディタ用スクリプト -->
+    <script src="event_core.js"></script>
+    <script src="event_logic.js"></script>
+    <script src="event_draw.js"></script>
+    <script src="event_input.js"></script>
 </body>
-
 </html>
