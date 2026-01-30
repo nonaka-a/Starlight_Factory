@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Event Play Test</title>
+    <style>
+        body {
+            background: #1a1a1a;
+            color: #fff;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: sans-serif;
+        }
+
+        canvas {
+            background: #000;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            max-width: 90vw;
+            max-height: 80vh;
+        }
+
+        #info {
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #aaa;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="info">Event Playing...</div>
+    <canvas id="view"></canvas>
+    <script src="test.js"></script>
+</body>
+
+</html>

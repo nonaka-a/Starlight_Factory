@@ -111,7 +111,19 @@ window.event_refreshProjectList = function () {
                 iconEl.style.backgroundPosition = 'center';
                 iconEl.style.backgroundRepeat = 'no-repeat';
                 iconEl.style.marginRight = '5px';
-            } else {
+            } else if (item.type === 'animation') {
+                let iconChar = item._collapsed ? '📁' : '📽️';
+                iconEl = document.createElement('span');
+                iconEl.textContent = iconChar + ' ';
+                iconEl.style.marginRight = '5px';
+
+                div.onclick = (e) => {
+                    item._collapsed = !item._collapsed;
+                    event_refreshProjectList();
+                    e.stopPropagation();
+                };
+            }
+            else {
                 let iconChar = '📄';
                 if (item.type === 'folder') iconChar = item._collapsed ? '📁' : '📂';
                 else if (item.type === 'comp') iconChar = '🎞️';
@@ -136,7 +148,7 @@ window.event_refreshProjectList = function () {
             });
 
             // フォルダへのドロップ受け入れ
-            if (item.type === 'folder') {
+            if (item.type === 'folder' || item.type === 'animation') {
                 div.addEventListener('dragover', (e) => {
                     e.preventDefault();
                     if (window.event_draggedProjectItem && window.event_draggedProjectItem !== item) {
@@ -156,11 +168,13 @@ window.event_refreshProjectList = function () {
                     }
                 });
 
-                div.onclick = (e) => {
-                    item._collapsed = !item._collapsed;
-                    event_refreshProjectList();
-                    e.stopPropagation();
-                };
+                if (item.type === 'folder') {
+                    div.onclick = (e) => {
+                        item._collapsed = !item._collapsed;
+                        event_refreshProjectList();
+                        e.stopPropagation();
+                    };
+                }
             }
             else if (item.type === 'comp') {
                 div.addEventListener('dblclick', (e) => {
@@ -174,8 +188,39 @@ window.event_refreshProjectList = function () {
 
             container.appendChild(div);
 
+            // サブアイテムの描画 (フォルダの子 または アニメーションの個別モーション)
             if (item.type === 'folder' && !item._collapsed && item.children) {
                 renderItems(item.children, container, depth + 1);
+            } else if (item.type === 'animation' && !item._collapsed && item.data) {
+                Object.keys(item.data).forEach(animKey => {
+                    const subDiv = document.createElement('div');
+                    subDiv.style.paddingLeft = `${(depth + 1) * 15 + 10}px`;
+                    subDiv.style.paddingTop = '2px';
+                    subDiv.style.paddingBottom = '2px';
+                    subDiv.style.cursor = 'pointer';
+                    subDiv.style.display = 'flex';
+                    subDiv.style.alignItems = 'center';
+                    subDiv.className = 'project-item sub-anim';
+                    subDiv.innerHTML = `<span style="margin-right:5px;">🏃</span> <span>${animKey}</span>`;
+
+                    subDiv.draggable = true;
+                    subDiv.addEventListener('dragstart', (e) => {
+                        // 個別アニメーションの情報をセット
+                        window.event_draggedAsset = {
+                            type: 'sub_animation',
+                            parentAssetId: item.id,
+                            animId: animKey,
+                            name: item.name.split('_')[0] + " (" + animKey + ")"
+                        };
+                        e.dataTransfer.effectAllowed = 'copy';
+                        e.stopPropagation();
+                    });
+
+                    subDiv.onmouseover = () => subDiv.style.backgroundColor = '#444';
+                    subDiv.onmouseout = () => subDiv.style.backgroundColor = '';
+
+                    container.appendChild(subDiv);
+                });
             }
         });
     }
@@ -208,6 +253,104 @@ window.event_onFileSelected = function (input) {
         reader.readAsDataURL(file);
     });
     input.value = '';
+};
+
+// --- JSON書き出し・読み込み ---
+
+// JSON書き出し
+window.event_exportJSON = function () {
+    // 現在のコンポジションの状態を assets に同期させる (念のため)
+    if (event_data.activeCompId) {
+        const comp = event_findAssetById(event_data.activeCompId);
+        if (comp) {
+            comp.layers = event_data.layers;
+            comp.name = event_data.composition.name;
+            comp.width = event_data.composition.width;
+            comp.height = event_data.composition.height;
+            comp.duration = event_data.composition.duration;
+            comp.fps = event_data.composition.fps;
+        }
+    }
+
+    // 保存用データ作成 (imgObj などの循環参照やシリアライズ不要なものを除く)
+    // JSON.stringify は関数や DOM要素、Imageオブジェクトなどを自動で除外するが、
+    // 構造を明確にするためにディープコピーして調整する
+    const exportData = {
+        activeCompId: event_data.activeCompId,
+        assets: event_data.assets
+    };
+
+    const json = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    const filename = (event_data.composition.name || "event_project") + ".json";
+    a.download = filename;
+    a.click();
+
+    URL.revokeObjectURL(url);
+    console.log("Project exported to JSON.");
+};
+
+// JSON読み込み
+window.event_importJSON = function (input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!data.assets) throw new Error("Invalid format: 'assets' not found");
+
+            event_pushHistory(); // 履歴保存
+
+            // データの読み込み
+            event_data.assets = data.assets;
+
+            // 全ての子孫を走査して Image オブジェクトを再生成する関数
+            function restoreImages(items) {
+                items.forEach(item => {
+                    if (item.type === 'comp' && item.layers) {
+                        item.layers.forEach(l => {
+                            if (l.source) {
+                                const img = new Image();
+                                img.src = l.source;
+                                img.onload = () => event_draw();
+                                l.imgObj = img;
+                            }
+                        });
+                    }
+                    if (item.type === 'folder' && item.children) {
+                        restoreImages(item.children);
+                    }
+                });
+            }
+            restoreImages(event_data.assets);
+
+            // プロジェクトリストの更新
+            event_refreshProjectList();
+
+            // コンポジションの切り替え (activeCompIdがあれば)
+            // 読み込み直後の switchComposition で古いデータが上書き保存されないように ID を一旦クリア
+            const targetCompId = data.activeCompId || (event_data.assets.find(a => a.type === 'comp') || {}).id;
+            event_data.activeCompId = null;
+
+            if (targetCompId) {
+                event_switchComposition(targetCompId);
+            }
+
+            console.log("Project imported from JSON.");
+            alert("プロジェクトを読み込みました。");
+        } catch (err) {
+            console.error(err);
+            alert("ファイルの読み込みに失敗しました: " + err.message);
+        }
+    };
+    reader.readAsText(file);
+    input.value = ''; // Reset input
 };
 
 // フォルダ作成

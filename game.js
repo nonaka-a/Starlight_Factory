@@ -218,7 +218,12 @@ window.onload = () => {
     fetch(ANIM_FILE_SRC)
         .then(res => res.json())
         .then(data => {
-            animData = data;
+            // 新フォーマット ( { tileSize, data } ) か 旧フォーマット ( { idle: ... } ) かを判定
+            if (data.data) {
+                animData = data.data;
+            } else {
+                animData = data;
+            }
         })
         .catch(() => {
             console.warn("アニメーションデータなし");
@@ -1437,7 +1442,7 @@ function drawLayer(layerIndex) {
 }
 
 function drawPlayer() {
-    let frame = { x: 0, y: 0, w: TILE_SIZE, h: TILE_SIZE };
+    let frame = { x: 0, y: 0, w: 0, h: 0 };
     if (animData[player.state] && animData[player.state].frames.length > 0) {
         const anim = animData[player.state];
         frame = anim.frames[player.frameIndex % anim.frames.length];

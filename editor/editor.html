@@ -103,7 +103,8 @@
             margin-right: 0;
         }
 
-        input[type="text"], input[type="number"] {
+        input[type="text"],
+        input[type="number"] {
             padding: 4px;
             border-radius: 2px;
             border: 1px solid #555;
@@ -164,6 +165,7 @@
             align-items: center;
             justify-content: center;
         }
+
         .modal {
             background: #333;
             padding: 20px;
@@ -204,7 +206,7 @@
             flex-direction: column;
             gap: 2px;
         }
-        
+
         .prop-item select {
             background: #222;
             color: #fff;
@@ -468,7 +470,7 @@
             border: 1px solid #555;
             border-radius: 4px;
         }
-        
+
         .chart-info-panel {
             display: flex;
             justify-content: space-between;
@@ -477,7 +479,6 @@
             color: #aaa;
             font-size: 0.9rem;
         }
-
     </style>
 </head>
 
@@ -487,8 +488,8 @@
     <div id="tab-bar">
         <button id="tab-map" class="tab-btn active" onclick="switchMode('map')">🗺️ マップ編集</button>
         <button id="tab-anim" class="tab-btn" onclick="switchMode('anim')">🏃 アニメ編集</button>
-        <button id="tab-chart" class="tab-btn" onclick="switchMode('chart')">🎼 譜面編集</button>
         <button id="tab-event" class="tab-btn" onclick="switchMode('event')">🎬 イベント編集</button>
+        <button id="tab-chart" class="tab-btn" onclick="switchMode('chart')">🎼 楽譜編集</button>
     </div>
 
     <!-- モード1: マップエディタ -->
@@ -579,12 +580,21 @@
         <div id="toolbar">
             <div class="tool-group">
                 <button onclick="anim_create()">➕ 新規アニメ</button>
-                <label class="btn" for="anim-img-input" style="background:#559;">🖼️ 画像読込</label>
+                <label class="btn" for="anim-img-input" style="background:#559;">▲ 画像読込</label>
                 <input type="file" id="anim-img-input" accept="image/*" multiple onchange="anim_loadImages(this)">
-                <button onclick="anim_saveImage()" style="background:#559;">🖼️ 画像保存</button>
-                <button onclick="anim_save()" style="background:#6a4;">💾 JSON保存</button>
-                <label class="btn" for="anim-file-input">📂 読込</label>
+                <button onclick="anim_saveImage()" style="background:#559;">▼ 画像保存</button>
+                <label class="btn" for="anim-file-input" style="background:#6a4;">▲ JSON読込</label>
                 <input type="file" id="anim-file-input" accept=".json" onchange="anim_load(this)">
+                <button onclick="anim_save()" style="background:#6a4;">▼ JSON保存</button>
+                <button onclick="anim_integrateToEvent()" style="background:#a55;">📽️ イベント統合</button>
+                <label style="margin-left:10px; font-size:0.8rem; color:#aaa;">パック名:</label>
+                <input type="text" id="anim-pack-name" value="char_player" placeholder="ファイル名" style="width:120px;">
+                <label style="margin-left:10px; font-size:0.8rem; color:#aaa;">マスサイズ:</label>
+                <select id="anim-tile-size" style="width:70px;" onchange="anim_onTileSizeChange()">
+                    <option value="64">64x64</option>
+                    <option value="128">128x128</option>
+                    <option value="256">256x256</option>
+                </select>
             </div>
             <div class="spacer"></div>
             <div class="tool-group">
@@ -605,7 +615,7 @@
                     </div>
                     <div class="preview-view">
                         <div style="margin-bottom:10px; color:#aaa; font-size:0.9rem;">プレビュー</div>
-                        <canvas id="anim-preview-canvas" width="128" height="128"
+                        <canvas id="anim-preview-canvas" width="256" height="256"
                             style="background:#444; border:1px solid #666;"></canvas>
                         <div style="margin-top:10px; display:flex; gap:5px;">
                             <button id="btn-anim-play" onclick="anim_togglePlay()" style="width:40px;">⏸</button>
@@ -682,11 +692,17 @@
         </div>
     </div>
 
-   <!-- モード4: イベントエディタ (Event) -->
+    <!-- モード4: イベントエディタ (Event) -->
     <div id="mode-event" class="mode-area">
         <div id="toolbar">
             <div class="tool-group">
                 <button onclick="event_openCompSettings()">⚙️ 設定</button>
+            </div>
+            <div class="tool-group">
+                <button onclick="event_exportJSON()" style="background:#6a4;">💾 JSON書出</button>
+                <label class="btn" for="event-json-load-input" style="background:#559;">📂 JSON読込</label>
+                <input type="file" id="event-json-load-input" accept=".json" style="display:none;"
+                    onchange="event_importJSON(this)">
             </div>
             <div class="tool-group">
                 <button id="btn-event-play" onclick="event_togglePlay()">▶ 再生</button>
@@ -697,62 +713,83 @@
         </div>
 
         <div id="event-workspace" style="flex: 1; display: flex; gap: 0; overflow: hidden;">
-            
+
             <!-- 追加: プロジェクトウィンドウ (左側) -->
-            <div id="event-project-panel" style="width: 250px; background: #2a2a2a; border: 1px solid #555; display: flex; flex-direction: column; flex-shrink: 0;">
-                <div style="padding: 5px; background: #333; color: #aaa; font-size: 0.8rem; border-bottom: 1px solid #444;">
+            <div id="event-project-panel"
+                style="width: 250px; background: #2a2a2a; border: 1px solid #555; display: flex; flex-direction: column; flex-shrink: 0;">
+                <div
+                    style="padding: 5px; background: #333; color: #aaa; font-size: 0.8rem; border-bottom: 1px solid #444;">
                     プロジェクト
                 </div>
                 <!-- ファイルリスト -->
-                <div id="event-project-list" style="flex: 1; overflow-y: auto; padding: 5px; color: #ddd; font-size: 0.9rem;">
+                <div id="event-project-list"
+                    style="flex: 1; overflow-y: auto; padding: 5px; color: #ddd; font-size: 0.9rem;">
                     <!-- JSで生成 -->
                 </div>
                 <!-- フッター -->
-                <div style="height: 30px; background: #333; border-top: 1px solid #444; display: flex; align-items: center; padding: 0 5px; gap: 5px;">
-                    <button onclick="event_createFolder()" style="padding: 2px 8px; font-size: 0.8rem;" title="新規フォルダ">📁</button>
-                    <button onclick="event_createComp()" style="padding: 2px 8px; font-size: 0.8rem;" title="新規コンポジション">🎞️</button>
+                <div
+                    style="height: 30px; background: #333; border-top: 1px solid #444; display: flex; align-items: center; padding: 0 5px; gap: 5px;">
+                    <button onclick="event_createFolder()" style="padding: 2px 8px; font-size: 0.8rem;"
+                        title="新規フォルダ">📁</button>
+                    <button onclick="event_createComp()" style="padding: 2px 8px; font-size: 0.8rem;"
+                        title="新規コンポジション">🎞️</button>
                     <!-- 画像読み込み用隠しinput -->
-                    <input type="file" id="event-file-input" multiple accept="image/*" style="display: none;" onchange="event_onFileSelected(this)">
+                    <input type="file" id="event-file-input" multiple accept="image/*" style="display: none;"
+                        onchange="event_onFileSelected(this)">
                 </div>
             </div>
 
             <!-- リサイズハンドル (プロジェクトパネル用) -->
-            <div id="event-project-resize" style="width: 5px; background: #333; cursor: col-resize; border-left: 1px solid #555; border-right: 1px solid #555;"></div>
+            <div id="event-project-resize"
+                style="width: 5px; background: #333; cursor: col-resize; border-left: 1px solid #555; border-right: 1px solid #555;">
+            </div>
 
             <!-- メインワークスペース (右側) -->
             <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
                 <!-- プレビュー画面 -->
-                <div id="event-preview-container" style="height: 55%; min-height: 100px; background: #111; border-bottom: 1px solid #555; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden;">
-                    <canvas id="event-preview-canvas" style="background: #000; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></canvas>
-                    
+                <div id="event-preview-container"
+                    style="height: 55%; min-height: 100px; background: #111; border-bottom: 1px solid #555; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                    <canvas id="event-preview-canvas"
+                        style="background: #000; box-shadow: 0 0 10px rgba(0,0,0,0.5);"></canvas>
+
                     <!-- プレビュー用ズームコントロール -->
-                    <div style="position: absolute; bottom: 5px; left: 5px; background: rgba(0,0,0,0.7); padding: 5px; border-radius: 4px; display: flex; gap: 5px; align-items: center;">
-                        <select id="event-preview-zoom-mode" onchange="event_updatePreviewZoomUI()" style="background:#333; color:#fff; border:1px solid #555; font-size:0.8rem;">
+                    <div
+                        style="position: absolute; bottom: 5px; left: 5px; background: rgba(0,0,0,0.7); padding: 5px; border-radius: 4px; display: flex; gap: 5px; align-items: center;">
+                        <select id="event-preview-zoom-mode" onchange="event_updatePreviewZoomUI()"
+                            style="background:#333; color:#fff; border:1px solid #555; font-size:0.8rem;">
                             <option value="fit">Fit</option>
                             <option value="0.5">50%</option>
                             <option value="1.0">100%</option>
                             <option value="2.0">200%</option>
                         </select>
-                        <input type="range" id="event-preview-zoom-slider" min="10" max="400" value="100" style="width: 80px;" oninput="event_onPreviewZoomSlider()">
-                        <span id="event-preview-zoom-text" style="font-size:0.8rem; color:#aaa; width:40px; text-align:right;">Fit</span>
+                        <input type="range" id="event-preview-zoom-slider" min="10" max="400" value="100"
+                            style="width: 80px;" oninput="event_onPreviewZoomSlider()">
+                        <span id="event-preview-zoom-text"
+                            style="font-size:0.8rem; color:#aaa; width:40px; text-align:right;">Fit</span>
                     </div>
                 </div>
 
                 <!-- 上下リサイズハンドル -->
-                <div id="event-resize-handle" style="height: 8px; background: #333; cursor: row-resize; border-top: 1px solid #555; border-bottom: 1px solid #555; display: flex; justify-content: center; align-items: center;">
+                <div id="event-resize-handle"
+                    style="height: 8px; background: #333; cursor: row-resize; border-top: 1px solid #555; border-bottom: 1px solid #555; display: flex; justify-content: center; align-items: center;">
                     <div style="width: 40px; height: 2px; background: #666; border-radius: 1px;"></div>
                 </div>
 
                 <!-- タイムラインパネル -->
-                <div id="event-timeline-panel" style="flex: 1; min-height: 100px; background: #2a2a2a; display: flex; flex-direction: column;">
-                    <div id="event-timeline-container" style="flex: 1; overflow-x: scroll; overflow-y: auto; position: relative;">
+                <div id="event-timeline-panel"
+                    style="flex: 1; min-height: 100px; background: #2a2a2a; display: flex; flex-direction: column;">
+                    <div id="event-timeline-container"
+                        style="flex: 1; overflow-x: scroll; overflow-y: auto; position: relative;">
                         <canvas id="event-timeline-canvas"></canvas>
                     </div>
-                    
-                    <div style="height: 30px; background: #333; border-top: 1px solid #444; display: flex; align-items: center; padding: 0 10px; gap: 10px;">
+
+                    <div
+                        style="height: 30px; background: #333; border-top: 1px solid #444; display: flex; align-items: center; padding: 0 10px; gap: 10px;">
                         <span style="font-size: 0.8rem; color: #aaa;">TL Zoom:</span>
-                        <input type="range" id="event-zoom" min="10" max="200" value="50" style="width: 150px;" oninput="event_draw()">
-                        <span style="font-size: 0.8rem; color: #666; margin-left: auto;">Key: Delete to remove keyframe</span>
+                        <input type="range" id="event-zoom" min="10" max="200" value="50" style="width: 150px;"
+                            oninput="event_draw()">
+                        <span style="font-size: 0.8rem; color: #666; margin-left: auto;">Key: Delete to remove
+                            keyframe</span>
                     </div>
                 </div>
             </div>
@@ -761,21 +798,27 @@
         <!-- コンポジション設定モーダル (変更なし) -->
         <div id="event-comp-modal" class="overlay" style="display: none;">
             <!-- ... (省略) ... -->
-             <div class="modal" style="width: 300px;">
+            <div class="modal" style="width: 300px;">
                 <h2>コンポジション設定</h2>
                 <div style="display: flex; flex-direction: column; gap: 10px; text-align: left;">
-                    <div><label style="font-size: 0.8rem;">名前</label><input type="text" id="inp-comp-name" style="width: 100%;"></div>
+                    <div><label style="font-size: 0.8rem;">名前</label><input type="text" id="inp-comp-name"
+                            style="width: 100%;"></div>
                     <div style="display: flex; gap: 10px;">
-                        <div style="flex: 1;"><label style="font-size: 0.8rem;">幅 (px)</label><input type="number" id="inp-comp-w" style="width: 100%;"></div>
-                        <div style="flex: 1;"><label style="font-size: 0.8rem;">高さ (px)</label><input type="number" id="inp-comp-h" style="width: 100%;"></div>
+                        <div style="flex: 1;"><label style="font-size: 0.8rem;">幅 (px)</label><input type="number"
+                                id="inp-comp-w" style="width: 100%;"></div>
+                        <div style="flex: 1;"><label style="font-size: 0.8rem;">高さ (px)</label><input type="number"
+                                id="inp-comp-h" style="width: 100%;"></div>
                     </div>
                     <div style="display: flex; gap: 10px;">
-                        <div style="flex: 1;"><label style="font-size: 0.8rem;">尺 (秒)</label><input type="number" id="inp-comp-duration" style="width: 100%;"></div>
-                        <div style="flex: 1;"><label style="font-size: 0.8rem;">フレームレート</label><input type="number" id="inp-comp-fps" style="width: 100%;"></div>
+                        <div style="flex: 1;"><label style="font-size: 0.8rem;">尺 (秒)</label><input type="number"
+                                id="inp-comp-duration" style="width: 100%;"></div>
+                        <div style="flex: 1;"><label style="font-size: 0.8rem;">フレームレート</label><input type="number"
+                                id="inp-comp-fps" style="width: 100%;"></div>
                     </div>
                 </div>
                 <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px;">
-                    <button class="danger" onclick="document.getElementById('event-comp-modal').style.display='none'">キャンセル</button>
+                    <button class="danger"
+                        onclick="document.getElementById('event-comp-modal').style.display='none'">キャンセル</button>
                     <button class="active" onclick="event_applyCompSettings()">OK</button>
                 </div>
             </div>
@@ -786,7 +829,7 @@
     <script src="editor_map.js"></script>
     <script src="editor_anim.js"></script>
     <script src="editor_chart.js"></script>
-    
+
     <!-- イベントエディタ用スクリプト -->
     <script src="event_core.js"></script>
     <script src="event_logic.js"></script>
@@ -796,7 +839,7 @@
 
     <script>
         // switchModeをグローバルに定義
-        window.switchMode = function(mode) {
+        window.switchMode = function (mode) {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             const tabBtn = document.getElementById(`tab-${mode}`);
             if (tabBtn) tabBtn.classList.add('active');
@@ -817,4 +860,5 @@
         };
     </script>
 </body>
+
 </html>

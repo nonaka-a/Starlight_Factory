@@ -1,6 +1,7 @@
 /**
  * イベントエディタ: コア (変数定義・初期化・ループ)
  * Step 14: コンポジション切り替え対応、初期画像読み込み修正
+ * Step 1 (Update): レイアウト定数変更
  */
 
 // --- 変数定義 ---
@@ -119,10 +120,23 @@ window.event_undo = function () {
     if (window.event_refreshProjectList) event_refreshProjectList();
 };
 
-// UI定数
-const EVENT_HEADER_HEIGHT = 25;
+const UI_LAYOUT = {
+    TRASH_RIGHT: 30,
+    PICK_RIGHT: 55,
+    PARENT_RIGHT: 145,
+
+    KEY_ADD_RIGHT: 30,
+    VAL_SINGLE_RIGHT: 120,
+    VAL_SINGLE_WIDTH: 80,
+    VAL_VEC_Y_RIGHT: 100,
+    VAL_VEC_X_RIGHT: 170,
+    VAL_VEC_WIDTH: 60
+};
+
+// UI定数 (パネル幅拡張)
+const EVENT_HEADER_HEIGHT = 30; // 25 -> 30
 const EVENT_TRACK_HEIGHT = 30;
-const EVENT_LEFT_PANEL_WIDTH = 250;
+const EVENT_LEFT_PANEL_WIDTH = 320; // 250 -> 320 (幅広げ)
 const EVENT_KEYFRAME_SIZE = 6;
 const EVENT_KEYFRAME_HIT_RADIUS = 8;
 const EVENT_VALUE_CLICK_WIDTH = 80;
@@ -162,6 +176,7 @@ window.initEventEditor = function () {
 
     // イベントリスナー設定
     event_canvasTimeline.addEventListener('mousedown', event_onTimelineMouseDown);
+    event_canvasTimeline.addEventListener('dblclick', event_onTimelineDblClick);
     window.addEventListener('mousemove', event_onGlobalMouseMove);
     window.addEventListener('mouseup', event_onGlobalMouseUp);
 

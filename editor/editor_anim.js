@@ -5,9 +5,9 @@
 // --- 変数定義 ---
 let anim_ctxSource, anim_canvasSource;
 let anim_ctxPreview, anim_canvasPreview;
-let anim_img = new Image();
+window.anim_img = new Image();
 let anim_sourceCanvas = document.createElement('canvas');
-let anim_data = {};
+window.anim_data = {};
 let anim_currentKey = null;
 let anim_isPlaying = true;
 let anim_timer = 0;
@@ -17,7 +17,7 @@ let anim_lastTime = 0;
 // ドラッグ&ドロップ用変数
 let anim_dragSrcIndex = null;
 
-const ANIM_TILE_SIZE = 64;
+let ANIM_TILE_SIZE = 64;
 
 // --- 初期化 ---
 window.initAnimEditor = function () {
@@ -95,15 +95,20 @@ function anim_loop(timestamp) {
 
         anim_ctxPreview.clearRect(0, 0, anim_canvasPreview.width, anim_canvasPreview.height);
 
+        // 背景 (プレビューエリア全体)
         anim_ctxPreview.fillStyle = '#222';
-        anim_ctxPreview.fillRect(0, 0, 128, 128);
+        anim_ctxPreview.fillRect(0, 0, anim_canvasPreview.width, anim_canvasPreview.height);
 
         if (anim.frames.length > 0) {
             const frame = anim.frames[anim_frameIndex % anim.frames.length];
             if (frame) {
-                const scale = 2;
-                const dx = (anim_canvasPreview.width - frame.w * scale) / 2;
-                const dy = (anim_canvasPreview.height - frame.h * scale) / 2;
+                // プレビューキャンバスの中央に描画し、キャンバスサイズに合わせて拡大・縮小
+                const previewCanvasSize = 256; // Assuming preview canvas is 256x256
+                const scale = Math.min(previewCanvasSize / frame.w, previewCanvasSize / frame.h);
+                const drawW = frame.w * scale;
+                const drawH = frame.h * scale;
+                const dx = (anim_canvasPreview.width - drawW) / 2;
+                const dy = (anim_canvasPreview.height - drawH) / 2;
 
                 anim_ctxPreview.imageSmoothingEnabled = false;
                 anim_ctxPreview.drawImage(
@@ -423,11 +428,16 @@ function anim_updateTimelineUI() {
 
 // --- 保存・読込 ---
 window.anim_save = function () {
-    const json = JSON.stringify(anim_data, null, 2);
+    const packName = document.getElementById('anim-pack-name').value || 'animations';
+    const output = {
+        tileSize: ANIM_TILE_SIZE,
+        data: window.anim_data
+    };
+    const json = JSON.stringify(output, null, 2);
     const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'animations.json';
+    a.download = packName + '.json';
     a.click();
 };
 
@@ -449,10 +459,11 @@ window.anim_saveImage = function () {
     }
 
     // ダウンロード処理
+    const packName = document.getElementById('anim-pack-name').value || 'char';
     const url = canvasToSave.toDataURL('image/png');
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'char.png';
+    a.download = packName + '.png';
     a.click();
 };
 
@@ -460,14 +471,24 @@ window.anim_load = function (input) {
     const file = input.files[0];
     if (!file) return;
 
+    // ファイル名をパック名に反映
+    const packName = file.name.replace(/\.[^/.]+$/, "");
+    document.getElementById('anim-pack-name').value = packName;
+
     const reader = new FileReader();
     reader.onload = (e) => {
         try {
-            const data = JSON.parse(e.target.result);
-            anim_data = data;
-            const firstKey = Object.keys(data)[0];
+            const obj = JSON.parse(e.target.result);
+            if (obj.tileSize) {
+                ANIM_TILE_SIZE = obj.tileSize;
+                document.getElementById('anim-tile-size').value = ANIM_TILE_SIZE;
+            }
+            window.anim_data = obj.data || obj; // 互換性維持
+
+            const firstKey = Object.keys(window.anim_data)[0];
             if (firstKey) anim_select(firstKey);
             anim_updateListUI();
+            anim_updateSourceView();
         } catch (err) {
             console.error(err);
             alert("読み込みエラー");
@@ -475,4 +496,29 @@ window.anim_load = function (input) {
     };
     reader.readAsText(file);
     input.value = '';
+};
+
+window.anim_onTileSizeChange = function () {
+    const newVal = parseInt(document.getElementById('anim-tile-size').value);
+
+    // 既存のフレームがある場合、サイズを更新するか聞く
+    let frameCount = 0;
+    Object.keys(window.anim_data).forEach(k => {
+        frameCount += window.anim_data[k].frames.length;
+    });
+
+    if (frameCount > 0) {
+        if (confirm(`既存の全フレーム (${frameCount}個) のサイズを ${newVal}x${newVal} に更新しますか？\n(注意: 切り抜き位置は左上のまま維持されます)`)) {
+            Object.keys(window.anim_data).forEach(k => {
+                window.anim_data[k].frames.forEach(f => {
+                    f.w = newVal;
+                    f.h = newVal;
+                });
+            });
+        }
+    }
+
+    ANIM_TILE_SIZE = newVal;
+    anim_drawSource();
+    anim_updateTimelineUI();
 };
