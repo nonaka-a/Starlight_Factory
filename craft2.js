@@ -457,7 +457,7 @@ const CraftMolding = {
 
         if (!imgs.loaded) {
             ctx.fillStyle = '#fff';
-            ctx.font = "20px sans-serif";
+            ctx.font = "20px 'M PLUS Rounded 1c', sans-serif";
             ctx.fillText("Loading Assets...", offsetX + 500, 300);
             return;
         }

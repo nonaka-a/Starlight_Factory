@@ -1,6 +1,6 @@
 /**
  * イベントエディタ: 入力処理
- * Step 16 (Fix): UI位置調整、Vector2個別操作対応
+ * Step 16 (Fix): UI位置調整、Vector2個別操作対応、スケール連動機能追加
  */
 
 // Pick Whip用ステート変数
@@ -34,6 +34,95 @@ window.event_onTimelineDrop = function (e) {
     window.event_draggedAsset = null;
 };
 
+// --- 右クリックメニュー表示 ---
+window.event_showKeyframeMenu = function (x, y, layerIdx, prop, keyObj) {
+    const menu = document.createElement('div');
+    menu.style.position = 'fixed';
+    menu.style.left = x + 'px';
+    menu.style.top = y + 'px';
+    menu.style.backgroundColor = '#333';
+    menu.style.border = '1px solid #666';
+    menu.style.padding = '5px 0';
+    menu.style.zIndex = '2000';
+    menu.style.boxShadow = '0 2px 10px rgba(0,0,0,0.5)';
+
+    const items = [
+        { 
+            label: (keyObj.interpolation === 'Hold' ? '✓ ' : '') + '停止キーフレーム', 
+            action: () => {
+                keyObj.interpolation = (keyObj.interpolation === 'Hold' ? 'Linear' : 'Hold');
+            }
+        },
+        { 
+            label: (keyObj.easeIn ? '✓ ' : '') + 'イーズイン', 
+            action: () => {
+                keyObj.easeIn = !keyObj.easeIn;
+            }
+        },
+        { 
+            label: (keyObj.easeOut ? '✓ ' : '') + 'イーズアウト', 
+            action: () => {
+                keyObj.easeOut = !keyObj.easeOut;
+            }
+        },
+        { 
+            label: '一括イーズイン/アウト', 
+            action: () => {
+                const state = !(keyObj.easeIn && keyObj.easeOut);
+                keyObj.easeIn = state;
+                keyObj.easeOut = state;
+            }
+        }
+    ];
+
+    items.forEach(item => {
+        const div = document.createElement('div');
+        div.textContent = item.label;
+        div.style.padding = '5px 20px';
+        div.style.cursor = 'pointer';
+        div.style.fontSize = '12px';
+        div.style.color = '#fff';
+        div.onmouseover = () => div.style.backgroundColor = '#444';
+        div.onmouseout = () => div.style.backgroundColor = '';
+        div.onclick = () => {
+            event_pushHistory();
+            item.action();
+            event_draw();
+            document.body.removeChild(menu);
+        };
+        menu.appendChild(div);
+    });
+
+    const closeMenu = (e) => {
+        if (!menu.contains(e.target)) {
+            if (menu.parentNode) document.body.removeChild(menu);
+            window.removeEventListener('mousedown', closeMenu);
+        }
+    };
+    window.addEventListener('mousedown', closeMenu);
+    document.body.appendChild(menu);
+};
+
+// --- ボタンからメニューを開く ---
+window.event_openKeyframeMenuFromButton = function (e) {
+    if (!event_selectedKey) {
+        alert("キーフレームを選択してください");
+        return;
+    }
+
+    const { layerIdx, prop, keyObj } = event_selectedKey;
+    
+    // ボタンの位置を取得
+    const btn = e.target;
+    const rect = btn.getBoundingClientRect();
+
+    // メニュー表示位置
+    const x = rect.left;
+    const y = Math.max(10, rect.top - 120);
+
+    event_showKeyframeMenu(x, y, layerIdx, prop, keyObj);
+};
+
 // --- ダブルクリック処理 (名前編集など) ---
 window.event_onTimelineDblClick = function (e) {
     const rect = event_canvasTimeline.getBoundingClientRect();
@@ -47,7 +136,7 @@ window.event_onTimelineDblClick = function (e) {
 
         // レイヤー行
         if (y >= currentY && y < currentY + EVENT_TRACK_HEIGHT) {
-            // レイヤー名エリア判定 (おおよそ x: 50 〜 EVENT_LEFT_PANEL_WIDTH - 100)
+            // レイヤー名エリア判定
             const nameStart = 50;
             const nameEnd = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT - 10;
 
@@ -83,6 +172,34 @@ window.event_onTimelineMouseDown = function (e) {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top + event_timelineContainer.scrollTop;
 
+    // 右クリック判定 (button 2)
+    if (e.button === 2) {
+        let curY = EVENT_HEADER_HEIGHT;
+        for (let i = 0; i < event_data.layers.length; i++) {
+            const layer = event_data.layers[i];
+            curY += EVENT_TRACK_HEIGHT;
+            if (layer.expanded) {
+                for (let prop of Object.keys(layer.tracks)) {
+                    if (y >= curY && y < curY + EVENT_TRACK_HEIGHT) {
+                        for (let key of layer.tracks[prop].keys) {
+                            const kx = EVENT_LEFT_PANEL_WIDTH + (key.time - event_viewStartTime) * event_pixelsPerSec;
+                            if (Math.abs(x - kx) <= EVENT_KEYFRAME_HIT_RADIUS) {
+                                // 右クリックでも選択状態にする
+                                event_selectedKey = { layerIdx: i, prop: prop, keyObj: key };
+                                event_selectedLayerIndex = i;
+                                event_draw(); 
+                                event_showKeyframeMenu(e.clientX, e.clientY, i, prop, key);
+                                return;
+                            }
+                        }
+                    }
+                    curY += EVENT_TRACK_HEIGHT;
+                }
+            }
+        }
+        return;
+    }
+
     // ヘッダー判定
     if (y < EVENT_HEADER_HEIGHT) {
         if (x > EVENT_LEFT_PANEL_WIDTH) {
@@ -103,7 +220,7 @@ window.event_onTimelineMouseDown = function (e) {
                 // UI判定エリア (右端からのオフセットで判定)
                 const fromRight = EVENT_LEFT_PANEL_WIDTH - x;
 
-                // ゴミ箱 (表示位置: EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.TRASH_RIGHT, 幅: 20)
+                // ゴミ箱
                 if (fromRight >= UI_LAYOUT.TRASH_RIGHT - 20 && fromRight <= UI_LAYOUT.TRASH_RIGHT) {
                     if (confirm("レイヤーを削除しますか？")) {
                         event_pushHistory();
@@ -114,7 +231,7 @@ window.event_onTimelineMouseDown = function (e) {
                     return;
                 }
 
-                // Pick Whip (◎) (表示位置:中心が EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PICK_RIGHT + 8)
+                // Pick Whip (◎)
                 if (fromRight >= UI_LAYOUT.PICK_RIGHT - 16 && fromRight <= UI_LAYOUT.PICK_RIGHT) {
                     event_state = 'drag-pickwhip';
                     event_pickWhipSourceLayerIdx = i;
@@ -122,7 +239,7 @@ window.event_onTimelineMouseDown = function (e) {
                     return;
                 }
 
-                // 親選択プルダウン (表示位置: EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT, 右側は PickWhip の左 5px)
+                // 親選択プルダウン
                 if (fromRight >= UI_LAYOUT.PICK_RIGHT + 5 && fromRight <= UI_LAYOUT.PARENT_RIGHT) {
                     event_showParentSelect(e.clientX, e.clientY, i);
                     return;
@@ -132,7 +249,7 @@ window.event_onTimelineMouseDown = function (e) {
                 if (x < 25) {
                     layer.expanded = !layer.expanded;
                 }
-                // 並び替え (それ以外のエリア)
+                // 並び替え
                 else {
                     event_pushHistory();
                     event_state = 'drag-layer-order';
@@ -191,7 +308,38 @@ window.event_onTimelineMouseDown = function (e) {
                         const curVal = event_getInterpolatedValue(i, prop, event_currentTime);
 
                         if (track.type === 'vector2') {
-                            // X値 (表示位置: EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_VEC_X_RIGHT, 幅: VAL_VEC_WIDTH)
+                            // Scale反転チェックボックスの判定
+                            if (prop === 'scale') {
+                                const checkXStart = EVENT_LEFT_PANEL_WIDTH - 220;
+                                if (x >= checkXStart && x <= checkXStart + 25) {
+                                    // X反転
+                                    event_pushHistory();
+                                    const newVal = { ...curVal, x: curVal.x * -1 };
+                                    event_updateKeyframe(i, prop, event_currentTime, newVal);
+                                    event_draw();
+                                    return;
+                                }
+                                if (x >= checkXStart + 30 && x <= checkXStart + 55) {
+                                    // Y反転
+                                    event_pushHistory();
+                                    const newVal = { ...curVal, y: curVal.y * -1 };
+                                    event_updateKeyframe(i, prop, event_currentTime, newVal);
+                                    event_draw();
+                                    return;
+                                }
+
+                                // ★追加: リンクボタン判定 (XとYの間)
+                                // X_END: L-115, Y_START: L-100
+                                // ボタン位置: L-113, 幅10px
+                                const linkBtnX = EVENT_LEFT_PANEL_WIDTH - 113;
+                                if (x >= linkBtnX && x <= linkBtnX + 10) {
+                                    track.linked = !track.linked;
+                                    event_draw();
+                                    return;
+                                }
+                            }
+
+                            // X値
                             if (fromRight >= UI_LAYOUT.VAL_VEC_X_RIGHT - UI_LAYOUT.VAL_VEC_WIDTH && fromRight <= UI_LAYOUT.VAL_VEC_X_RIGHT) {
                                 event_pushHistory();
                                 event_state = 'check-value-edit';
@@ -199,11 +347,12 @@ window.event_onTimelineMouseDown = function (e) {
                                 event_dragTarget = {
                                     type: 'value', layerIdx: i, prop: prop, subProp: 'x',
                                     startVal: curVal.x, step: track.step, trackType: 'vector2',
-                                    originX: x, originY: y, min: track.min, max: track.max
+                                    originX: x, originY: y, min: track.min, max: track.max,
+                                    currentRatio: (curVal.x !== 0) ? (curVal.y / curVal.x) : 1 // 連動用比率
                                 };
                                 return;
                             }
-                            // Y値 (表示位置: EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_VEC_Y_RIGHT, 幅: VAL_VEC_WIDTH)
+                            // Y値
                             if (fromRight >= UI_LAYOUT.VAL_VEC_Y_RIGHT - UI_LAYOUT.VAL_VEC_WIDTH && fromRight <= UI_LAYOUT.VAL_VEC_Y_RIGHT) {
                                 event_pushHistory();
                                 event_state = 'check-value-edit';
@@ -211,12 +360,13 @@ window.event_onTimelineMouseDown = function (e) {
                                 event_dragTarget = {
                                     type: 'value', layerIdx: i, prop: prop, subProp: 'y',
                                     startVal: curVal.y, step: track.step, trackType: 'vector2',
-                                    originX: x, originY: y, min: track.min, max: track.max
+                                    originX: x, originY: y, min: track.min, max: track.max,
+                                    currentRatio: (curVal.y !== 0) ? (curVal.x / curVal.y) : 1 // 連動用比率
                                 };
                                 return;
                             }
                         } else {
-                            // Single Value (表示位置: EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_SINGLE_RIGHT, 幅: VAL_SINGLE_WIDTH)
+                            // Single Value
                             if (fromRight >= UI_LAYOUT.VAL_SINGLE_RIGHT - UI_LAYOUT.VAL_SINGLE_WIDTH && fromRight <= UI_LAYOUT.VAL_SINGLE_RIGHT) {
                                 event_pushHistory();
                                 event_state = 'check-value-edit';
@@ -230,7 +380,7 @@ window.event_onTimelineMouseDown = function (e) {
                             }
                         }
 
-                        // キーフレーム追加ボタン (表示位置: 中心が EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.KEY_ADD_RIGHT)
+                        // キーフレーム追加ボタン
                         if (fromRight >= UI_LAYOUT.KEY_ADD_RIGHT - 10 && fromRight <= UI_LAYOUT.KEY_ADD_RIGHT + 10) {
                             event_pushHistory();
                             const val = event_getInterpolatedValue(i, prop, event_currentTime);
@@ -243,21 +393,20 @@ window.event_onTimelineMouseDown = function (e) {
                     } else {
                         // キーフレーム選択
                         let hit = false;
-                        for (let k = 0; k < track.keys.length; k++) {
-                            const key = track.keys[k];
-                            const kx = EVENT_LEFT_PANEL_WIDTH + (key.time - event_viewStartTime) * event_pixelsPerSec;
-                            if (Math.abs(x - kx) <= EVENT_KEYFRAME_HIT_RADIUS) {
-                                event_pushHistory();
-                                event_state = 'drag-key';
-                                event_dragTarget = { type: 'key', obj: key, layerIdx: i, prop: prop };
-                                event_selectedKey = { layerIdx: i, prop: prop, keyObj: key };
-                                event_draw();
-                                hit = true;
-                                break;
+                        if (track.keys) {
+                            for (let k = 0; k < track.keys.length; k++) {
+                                const key = track.keys[k];
+                                const kx = EVENT_LEFT_PANEL_WIDTH + (key.time - event_viewStartTime) * event_pixelsPerSec;
+                                if (Math.abs(x - kx) <= EVENT_KEYFRAME_HIT_RADIUS) {
+                                    event_pushHistory();
+                                    event_state = 'drag-key';
+                                    event_dragTarget = { type: 'key', obj: key, layerIdx: i, prop: prop };
+                                    event_selectedKey = { layerIdx: i, prop: prop, keyObj: key };
+                                    event_draw();
+                                    hit = true;
+                                    break;
+                                }
                             }
-                        }
-                        if (!hit) {
-                            // event_selectedKey = null; 
                         }
                     }
                     return;
@@ -331,14 +480,47 @@ window.event_onGlobalMouseMove = function (e) {
     else if (event_state === 'scrub-value') {
         const delta = e.clientX - event_dragStartPos.x;
         const target = event_dragTarget;
+        const layer = event_data.layers[target.layerIdx];
+        const track = layer.tracks[target.prop];
         let newVal;
 
         if (target.trackType === 'vector2') {
-            // subProp (x or y) を見て個別更新
             const currentVec = event_getInterpolatedValue(target.layerIdx, target.prop, event_currentTime);
             newVal = { ...currentVec };
-            // Vector2のドラッグは開始時の値 + delta
-            newVal[target.subProp] = target.startVal + delta * target.step;
+            
+            // 変更後の値
+            const updatedVal = target.startVal + delta * target.step;
+            newVal[target.subProp] = updatedVal;
+
+            // ★追加: スケール連動処理 (ScaleかつLinkedがtrueの場合)
+            if (target.prop === 'scale' && track.linked) {
+                // startVal(開始時の絶対値)の符号
+                // currentVec[target.subProp] は補間値なので符号も持っている
+                // ここでは単純に比率で更新する
+                // target.currentRatio は 開始時の 他方 / 一方
+                if (target.subProp === 'x') {
+                    // Y = X * ratio
+                    // 符号は維持したいが、比率計算だと符号も変わる可能性がある
+                    // スケール連動は通常「大きさ」の連動なので、符号（反転）は維持するべき
+                    const signY = currentVec.y < 0 ? -1 : 1;
+                    const signX = currentVec.x < 0 ? -1 : 1;
+                    // startValは現在の絶対値操作かもしれないが、event_getInterpolatedValueは生の値
+                    // ドラッグ操作は基本的に加算だが、Vector2の場合は個別に計算済み
+                    
+                    // シンプルに: 比率を維持して絶対値を合わせる
+                    // updatedVal は生の値（負もありうる）
+                    // リンク時は絶対値の比率を適用
+                    const absX = Math.abs(updatedVal);
+                    const absY = absX * Math.abs(target.currentRatio);
+                    newVal.y = absY * signY;
+                } else {
+                    // X = Y * ratio
+                    const signX = currentVec.x < 0 ? -1 : 1;
+                    const absY = Math.abs(updatedVal);
+                    const absX = absY * Math.abs(target.currentRatio);
+                    newVal.x = absX * signX;
+                }
+            }
         } else {
             newVal = target.startVal + delta * target.step;
             if (target.min !== undefined) newVal = Math.max(target.min, newVal);
@@ -399,7 +581,7 @@ window.event_onGlobalMouseMove = function (e) {
         layer.inPoint += dt;
         layer.outPoint += dt;
         Object.values(layer.tracks).forEach(track => {
-            track.keys.forEach(key => key.time += dt);
+            if (track.keys) track.keys.forEach(key => key.time += dt);
         });
 
         event_dragStartPos = { x: e.clientX, y: e.clientY };
@@ -471,12 +653,14 @@ window.event_onGlobalMouseUp = function (e) {
 
     if (event_state === 'check-value-edit') {
         const target = event_dragTarget;
+        const layer = event_data.layers[target.layerIdx];
+        const track = layer.tracks[target.prop];
         let initStr = "";
 
         // インライン入力用の初期値
         if (target.trackType === 'vector2') {
-            // 個別入力なので単一の値を表示
-            initStr = target.startVal.toFixed(1);
+            // UI上は絶対値を表示しているので、入力初期値も絶対値にする
+            initStr = Math.abs(target.startVal).toFixed(1);
         } else if (target.trackType === 'rotation') {
             const r = Math.floor(target.startVal / 360);
             const d = Math.floor(target.startVal % 360);
@@ -500,7 +684,27 @@ window.event_onGlobalMouseUp = function (e) {
                     const finalVec = { ...currentVec };
                     const f = parseFloat(newVal);
                     if (!isNaN(f)) {
-                        finalVec[target.subProp] = f;
+                        // 元の値の符号を維持して絶対値を上書き
+                        const sign = currentVec[target.subProp] < 0 ? -1 : 1;
+                        finalVal = Math.abs(f) * sign;
+                        finalVec[target.subProp] = finalVal;
+
+                        // ★追加: スケール連動処理 (インライン入力時)
+                        if (target.prop === 'scale' && track.linked) {
+                            if (target.subProp === 'x') {
+                                const signY = currentVec.y < 0 ? -1 : 1;
+                                // currentRatioはドラッグ開始時しか設定されないため、ここで再計算必要だが
+                                // 簡単のため、現在の比率 (Y/X) を使う
+                                // ただし X=0 の場合は比率が作れないのでガードが必要
+                                const ratio = (currentVec.x !== 0) ? Math.abs(currentVec.y / currentVec.x) : 1;
+                                finalVec.y = Math.abs(finalVal) * ratio * signY;
+                            } else {
+                                const signX = currentVec.x < 0 ? -1 : 1;
+                                const ratio = (currentVec.y !== 0) ? Math.abs(currentVec.x / currentVec.y) : 1;
+                                finalVec.x = Math.abs(finalVal) * ratio * signX;
+                            }
+                        }
+
                         event_updateKeyframe(target.layerIdx, target.prop, event_currentTime, finalVec);
                     }
                 } else {
@@ -531,7 +735,7 @@ window.event_onGlobalMouseUp = function (e) {
         layer.inPoint += diff;
         layer.outPoint += diff;
         Object.values(layer.tracks).forEach(track => {
-            track.keys.forEach(key => key.time = event_snapTime(key.time));
+            if (track.keys) track.keys.forEach(key => key.time = event_snapTime(key.time));
         });
         event_draw();
     }
@@ -584,8 +788,11 @@ window.event_onKeyDown = function (e) {
         if (event_selectedKey) {
             e.preventDefault();
             event_pushHistory();
-            event_selectedKey.keyObj.easing = 'EaseInOut';
-            console.log("Keyframe set to EaseInOut");
+            // F9はイーズインアウト切り替え（トグルが望ましいが簡易的にON）
+            const state = !(event_selectedKey.keyObj.easeIn && event_selectedKey.keyObj.easeOut);
+            event_selectedKey.keyObj.easeIn = state;
+            event_selectedKey.keyObj.easeOut = state;
+            console.log("Keyframe easing toggled");
             event_draw();
         }
         return;
@@ -663,12 +870,6 @@ window.event_showInlineInput = function (x, y, initialValue, trackType, callback
         const valStr = input.value;
         let finalVal = null;
 
-        // Vector2の個別入力時は単一数値としてパース
-        // ただし trackType が vector2 のままだと既存ロジックが vector2 パースしようとするので注意が必要だが、
-        // コールバック内で処理分けしているのでここでは単純に値を渡すだけで良い。
-        // event_onGlobalMouseUp のコールバックで型に応じた処理をしている。
-
-        // 既存のパースロジック（Single Value）
         if (trackType === 'rotation') {
             if (valStr.includes('+')) {
                 const parts = valStr.split('+');
@@ -784,3 +985,13 @@ window.event_showEnumSelect = function (x, y, initialValue, options, callback) {
     document.body.appendChild(select);
     select.focus();
 };
+
+// Canvas初期化時にコンテキストメニューを抑制
+// window.initEventEditor内でcanvas取得後に設定されるのが理想ですが
+// DOMContentLoadedタイミングでも安全策として設定します
+window.addEventListener('DOMContentLoaded', () => {
+    const canvas = document.getElementById('event-timeline-canvas');
+    if (canvas) {
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    }
+});

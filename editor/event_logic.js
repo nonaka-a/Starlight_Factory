@@ -1,13 +1,13 @@
 /**
  * イベントエディタ: ロジック
  * Step 16: コピー＆ペースト対応
- * Step 1 (Update): イージング機能、親子関係ロジック(位置補正)
+ * Step 1 (Update): イージング機能（AE準拠）、親子関係、スケール連動初期値
  */
 
 // クリップボード (メモリ内)
 let event_clipboardKey = null; // { value: ..., type: ... }
 
-// イージング関数定義
+// イージング関数定義 (基本計算用)
 const event_easingFunctions = {
     'Linear': (t) => t,
     'EaseInOut': (t) => 0.5 * (1 - Math.cos(t * Math.PI))
@@ -27,10 +27,8 @@ window.event_findAssetById = function (id, list = event_data.assets) {
 
 window.event_copySelectedKeyframe = function () {
     if (!event_selectedKey) return;
-    const val = event_selectedKey.keyObj.value;
-    const copiedVal = (typeof val === 'object') ? { ...val } : val;
-    const easing = event_selectedKey.keyObj.easing || 'Linear';
-    event_clipboardKey = { value: copiedVal, easing: easing };
+    // キーフレームオブジェクト全体をコピー
+    event_clipboardKey = JSON.parse(JSON.stringify(event_selectedKey.keyObj));
     console.log("Keyframe copied");
 };
 
@@ -40,13 +38,15 @@ window.event_pasteKeyframe = function () {
     if (event_selectedKey) {
         // 同じプロパティにペースト
         const { layerIdx, prop } = event_selectedKey;
-        const val = (typeof event_clipboardKey.value === 'object') ? { ...event_clipboardKey.value } : event_clipboardKey.value;
+        const val = event_clipboardKey.value; // 値
+        
+        // 値を更新
         const key = event_updateKeyframe(layerIdx, prop, event_currentTime, val);
 
-        // イージング設定もペースト
-        if (event_clipboardKey.easing) {
-            key.easing = event_clipboardKey.easing;
-        }
+        // イージング・補間設定もペースト
+        key.easeIn = event_clipboardKey.easeIn;
+        key.easeOut = event_clipboardKey.easeOut;
+        key.interpolation = event_clipboardKey.interpolation;
 
         event_draw();
         console.log("Keyframe pasted");
@@ -116,10 +116,11 @@ window.event_addLayer = function (name, source) {
         inPoint: 0,
         outPoint: event_data.composition.duration,
         tracks: {
-            "position": { label: "Position", type: "vector2", keys: [{ time: 0, value: { x: cx, y: cy }, easing: 'Linear' }], step: 1 },
-            "scale": { label: "Scale", type: "number", keys: [{ time: 0, value: 100, easing: 'Linear' }], min: 0, max: 1000, step: 1 },
-            "rotation": { label: "Rotation", type: "rotation", keys: [{ time: 0, value: 0, easing: 'Linear' }], min: -3600, max: 3600, step: 1 },
-            "opacity": { label: "Opacity", type: "number", keys: [{ time: 0, value: 100, easing: 'Linear' }], min: 0, max: 100, step: 1 }
+            "position": { label: "Position", type: "vector2", keys: [], step: 1, initialValue: { x: cx, y: cy } },
+            // Scaleに linked: true を追加
+            "scale": { label: "Scale", type: "vector2", linked: true, keys: [], step: 1, initialValue: { x: 100, y: 100 } },
+            "rotation": { label: "Rotation", type: "rotation", keys: [], min: -3600, max: 3600, step: 1, initialValue: 0 },
+            "opacity": { label: "Opacity", type: "number", keys: [], min: 0, max: 100, step: 1, initialValue: 100 }
         }
     };
 
@@ -145,12 +146,15 @@ window.event_updateKeyframe = function (layerIndex, prop, time, value) {
         existingKey.value = valToSave;
         return existingKey;
     } else {
-        // 新規キーフレームは直前のキーフレームのイージングを引き継ぐか、デフォルト 'Linear'
-        let defaultEasing = 'Linear';
-        const prevKey = track.keys.filter(k => k.time < time).sort((a, b) => b.time - a.time)[0];
-        if (prevKey && prevKey.easing) defaultEasing = prevKey.easing;
-
-        const newKey = { time: time, value: valToSave, easing: defaultEasing };
+        // 新規キーフレーム作成
+        // デフォルトはリニア
+        const newKey = { 
+            time: time, 
+            value: valToSave, 
+            easeIn: false, 
+            easeOut: false, 
+            interpolation: 'Linear' 
+        };
         track.keys.push(newKey);
         track.keys.sort((a, b) => a.time - b.time);
         return newKey;
@@ -198,8 +202,6 @@ window.event_setLayerParent = function (childLayerIdx, parentLayerId) {
     }
 
     // 位置補正: 親を設定/解除しても、現在の見た目の位置を維持するようにローカル座標を補正する
-    // ※ 簡易実装として「現在時刻」での親の位置をオフセットとして適用する
-
     let offsetX = 0;
     let offsetY = 0;
 
@@ -235,13 +237,11 @@ window.event_snapTime = function (time) {
     return frame * frameDuration;
 };
 
-// --- 補間計算 (イージング対応) ---
+// --- 補間計算 (イージング・停止キーフレーム対応) ---
 window.event_getInterpolatedValue = function (layerIndex, prop, time) {
     const track = event_data.layers[layerIndex].tracks[prop];
-    if (!track.keys.length) {
-        if (track.type === 'vector2') return { x: 0, y: 0 };
-        if (track.type === 'string') return "";
-        return 0;
+    if (!track.keys || track.keys.length === 0) {
+        return track.initialValue;
     }
     const keys = track.keys;
     if (keys.length === 1) return keys[0].value;
@@ -252,16 +252,27 @@ window.event_getInterpolatedValue = function (layerIndex, prop, time) {
         const k1 = keys[i];
         const k2 = keys[i + 1];
         if (time >= k1.time && time < k2.time) {
-            if (track.type === 'string') {
-                return k1.value; // ホールド補間 (文字列/アニメーション名用)
+            // 停止キーフレーム (Hold)
+            if (track.type === 'string' || k1.interpolation === 'Hold') {
+                return k1.value;
             }
 
             let t = (time - k1.time) / (k2.time - k1.time);
 
-            // イージング適用
-            const easingType = k1.easing || 'Linear';
-            const easeFunc = event_easingFunctions[easingType] || event_easingFunctions['Linear'];
-            t = easeFunc(t);
+            // イージング計算 (k1のアウトとk2のインを参照)
+            const easeIn = k2.easeIn;   // 終点側（入ってくる）設定
+            const easeOut = k1.easeOut; // 始点側（出ていく）設定
+
+            if (easeIn && easeOut) {
+                // 両方: ゆっくり加速して始まり、ゆっくり減速して終わる (S字)
+                t = 0.5 * (1 - Math.cos(t * Math.PI));
+            } else if (easeIn) {
+                // イーズインのみ: 終点に向かって減速（ゆっくり停車する）
+                t = 1 - (1 - t) * (1 - t); 
+            } else if (easeOut) {
+                // イーズアウトのみ: 始点から加速（ゆっくり発車する）
+                t = t * t;
+            }
 
             if (typeof k1.value === 'number') {
                 return k1.value + (k2.value - k1.value) * t;
@@ -479,11 +490,12 @@ window.event_addAnimatedLayer = function (name, animAssetId, animId) {
         inPoint: 0,
         outPoint: event_data.composition.duration,
         tracks: {
-            "motion": { label: "Motion", type: "string", keys: [{ time: 0, value: targetAnimId }], step: 1 },
-            "position": { label: "Position", type: "vector2", keys: [{ time: 0, value: { x: cx, y: cy }, easing: 'Linear' }], step: 1 },
-            "scale": { label: "Scale", type: "number", keys: [{ time: 0, value: 100, easing: 'Linear' }], min: 0, max: 1000, step: 1 },
-            "rotation": { label: "Rotation", type: "rotation", keys: [{ time: 0, value: 0, easing: 'Linear' }], min: -3600, max: 3600, step: 1 },
-            "opacity": { label: "Opacity", type: "number", keys: [{ time: 0, value: 100, easing: 'Linear' }], min: 0, max: 100, step: 1 }
+            "motion": { label: "Motion", type: "string", keys: [], step: 1, initialValue: targetAnimId },
+            "position": { label: "Position", type: "vector2", keys: [], step: 1, initialValue: { x: cx, y: cy } },
+            // Scaleに linked: true を追加
+            "scale": { label: "Scale", type: "vector2", linked: true, keys: [], step: 1, initialValue: { x: 100, y: 100 } },
+            "rotation": { label: "Rotation", type: "rotation", keys: [], min: -3600, max: 3600, step: 1, initialValue: 0 },
+            "opacity": { label: "Opacity", type: "number", keys: [], min: 0, max: 100, step: 1, initialValue: 100 }
         }
     };
 

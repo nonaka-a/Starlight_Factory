@@ -788,6 +788,9 @@
                         <span style="font-size: 0.8rem; color: #aaa;">TL Zoom:</span>
                         <input type="range" id="event-zoom" min="10" max="200" value="50" style="width: 150px;"
                             oninput="event_draw()">
+                        <!-- ★追加: KF制御ボタン -->
+                        <button onclick="event_openKeyframeMenuFromButton(event)" style="font-size: 0.8rem; padding: 2px 8px; margin-left: 5px;">KF制御</button>
+
                         <span style="font-size: 0.8rem; color: #666; margin-left: auto;">Key: Delete to remove
                             keyframe</span>
                     </div>

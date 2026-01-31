@@ -1,7 +1,15 @@
 /**
  * イベントエディタ: 描画関連
- * Step 16 (Fix): UI位置調整、Vector2個別操作対応
+ * Step 16 (Fix): UI位置調整、Vector2個別操作対応、スケール連動UI
  */
+
+// UI定数のオーバーライド (Vector2の値を表示する幅と位置を調整)
+// 元のUI_LAYOUT = { TRASH_RIGHT: 30, PICK_RIGHT: 55, PARENT_RIGHT: 145, KEY_ADD_RIGHT: 30, VAL_SINGLE_RIGHT: 120, VAL_SINGLE_WIDTH: 80, VAL_VEC_Y_RIGHT: 100, VAL_VEC_X_RIGHT: 170, VAL_VEC_WIDTH: 60 };
+// X値の右端を左にずらし(175)、間にスペースを作る
+Object.assign(UI_LAYOUT, {
+    VAL_VEC_X_RIGHT: 175, // 185 -> 175 (さらに右に寄せた)
+    VAL_VEC_Y_RIGHT: 100
+});
 
 // 値フォーマット
 function event_formatValue(val, type) {
@@ -79,8 +87,11 @@ function event_applyLayerTransform(ctx, layerIdx, time) {
 
     ctx.translate(pos.x, pos.y);
     ctx.rotate(rot * Math.PI / 180);
-    const s = lScale / 100;
-    ctx.scale(s, s);
+    
+    // スケール値の正負によって反転を表現
+    const sx = lScale.x / 100;
+    const sy = lScale.y / 100;
+    ctx.scale(sx, sy);
 }
 
 // --- 描画メイン ---
@@ -364,13 +375,54 @@ window.event_draw = function () {
 
                 // --- 値表示 & ドラッグUI ---
                 if (track.type === 'vector2') {
+                    // Scale プロパティの場合のみチェックボックスを表示
+                    if (propName === 'scale') {
+                        const checkX = EVENT_LEFT_PANEL_WIDTH - 220;
+                        ctx.font = '10px sans-serif';
+                        
+                        // X反転チェック (塗りつぶしでON状態を表現)
+                        ctx.fillStyle = (val.x < 0) ? '#0ff' : '#444';
+                        ctx.fillRect(checkX, currentY + 8, 12, 12);
+                        ctx.strokeStyle = '#888';
+                        ctx.strokeRect(checkX, currentY + 8, 12, 12);
+                        ctx.fillStyle = '#aaa';
+                        ctx.fillText("x", checkX + 15, currentY + 18);
+
+                        // Y反転チェック
+                        ctx.fillStyle = (val.y < 0) ? '#0ff' : '#444';
+                        ctx.fillRect(checkX + 30, currentY + 8, 12, 12);
+                        ctx.strokeStyle = '#888';
+                        ctx.strokeRect(checkX + 30, currentY + 8, 12, 12);
+                        ctx.fillStyle = '#aaa';
+                        ctx.fillText("y", checkX + 45, currentY + 18);
+
+                        // ★追加: リンクボタン (XとYの間)
+                        // VAL_VEC_X_RIGHT: 175 -> X_END: L-115
+                        // VAL_VEC_Y_RIGHT: 100 -> Y_START: L-100
+                        // 隙間: L-115 ~ L-100 (15px)
+                        const linkBtnX = EVENT_LEFT_PANEL_WIDTH - 113; // 隙間の中央
+                        const linkBtnY = currentY + 8;
+                        const linkBtnW = 10;
+                        
+                        ctx.fillStyle = '#444';
+                        if (track.linked) ctx.fillStyle = '#666'; // ON時は少し明るく
+                        ctx.fillRect(linkBtnX, linkBtnY, linkBtnW, 12);
+                        ctx.strokeStyle = '#888';
+                        ctx.strokeRect(linkBtnX, linkBtnY, linkBtnW, 12);
+                        
+                        // 鎖アイコンの代わりに「-」や「∞」っぽい記号
+                        ctx.fillStyle = track.linked ? '#fff' : '#888';
+                        ctx.fillText(track.linked ? "∞" : "-", linkBtnX + 1, currentY + 17);
+                    }
+
                     // X値
                     const valX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_VEC_X_RIGHT;
                     ctx.fillStyle = '#3a2a2a'; // 赤っぽい背景
                     ctx.fillRect(valX, currentY + 4, UI_LAYOUT.VAL_VEC_WIDTH, EVENT_TRACK_HEIGHT - 8);
                     ctx.fillStyle = '#f88';
                     ctx.textAlign = 'right';
-                    ctx.fillText(val.x.toFixed(1), valX + UI_LAYOUT.VAL_VEC_WIDTH - 4, currentY + 19);
+                    // UI上は絶対値を表示
+                    ctx.fillText(Math.abs(val.x).toFixed(1), valX + UI_LAYOUT.VAL_VEC_WIDTH - 4, currentY + 19);
 
                     // Y値
                     const valY = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.VAL_VEC_Y_RIGHT;
@@ -378,7 +430,7 @@ window.event_draw = function () {
                     ctx.fillRect(valY, currentY + 4, UI_LAYOUT.VAL_VEC_WIDTH, EVENT_TRACK_HEIGHT - 8);
                     ctx.fillStyle = '#8f8';
                     ctx.textAlign = 'right';
-                    ctx.fillText(val.y.toFixed(1), valY + UI_LAYOUT.VAL_VEC_WIDTH - 4, currentY + 19);
+                    ctx.fillText(Math.abs(val.y).toFixed(1), valY + UI_LAYOUT.VAL_VEC_WIDTH - 4, currentY + 19);
 
                     ctx.textAlign = 'left';
                 } else {
@@ -397,29 +449,44 @@ window.event_draw = function () {
                 const btnX = EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.KEY_ADD_RIGHT;
                 const btnY = currentY + EVENT_TRACK_HEIGHT / 2;
                 ctx.strokeStyle = '#aaa'; ctx.beginPath(); ctx.moveTo(btnX, btnY - 5); ctx.lineTo(btnX + 5, btnY); ctx.lineTo(btnX, btnY + 5); ctx.lineTo(btnX - 5, btnY); ctx.closePath(); ctx.stroke();
-                const hasKey = track.keys.some(k => Math.abs(k.time - drawTime) < 0.001);
+                
+                // 現在時刻にキーフレームがあるかチェック
+                const hasKey = track.keys && track.keys.some(k => Math.abs(k.time - drawTime) < 0.001);
                 if (hasKey) { ctx.fillStyle = '#48f'; ctx.fill(); }
 
                 ctx.save();
                 ctx.beginPath(); ctx.rect(EVENT_LEFT_PANEL_WIDTH, currentY, w - EVENT_LEFT_PANEL_WIDTH, EVENT_TRACK_HEIGHT); ctx.clip();
-                track.keys.forEach(key => {
-                    const kx = EVENT_LEFT_PANEL_WIDTH + (key.time - event_viewStartTime) * event_pixelsPerSec;
-                    const ky = currentY + EVENT_TRACK_HEIGHT / 2;
-                    const isSelected = (event_selectedKey && event_selectedKey.keyObj === key);
-                    const isDragging = (event_dragTarget && event_dragTarget.type === 'key' && event_dragTarget.obj === key);
-                    const isEase = (key.easing === 'EaseInOut');
+                if (track.keys) {
+                    track.keys.forEach(key => {
+                        const kx = EVENT_LEFT_PANEL_WIDTH + (key.time - event_viewStartTime) * event_pixelsPerSec;
+                        const ky = currentY + EVENT_TRACK_HEIGHT / 2;
+                        const isSelected = (event_selectedKey && event_selectedKey.keyObj === key);
+                        const isDragging = (event_dragTarget && event_dragTarget.type === 'key' && event_dragTarget.obj === key);
+                        
+                        const isHold = (key.interpolation === 'Hold');
+                        const isEase = (key.easeIn || key.easeOut);
 
-                    if (isSelected || isDragging) { ctx.fillStyle = '#ff0'; ctx.strokeStyle = '#fff'; }
-                    else { ctx.fillStyle = '#ddd'; ctx.strokeStyle = '#000'; }
+                        if (isSelected || isDragging) { ctx.fillStyle = '#ff0'; ctx.strokeStyle = '#fff'; }
+                        else { ctx.fillStyle = isHold ? '#f88' : '#ddd'; ctx.strokeStyle = '#000'; }
 
-                    ctx.beginPath();
-                    if (isEase) {
-                        ctx.arc(kx, ky, EVENT_KEYFRAME_SIZE, 0, Math.PI * 2);
-                    } else {
-                        ctx.moveTo(kx, ky - EVENT_KEYFRAME_SIZE); ctx.lineTo(kx + EVENT_KEYFRAME_SIZE, ky); ctx.lineTo(kx, ky + EVENT_KEYFRAME_SIZE); ctx.lineTo(kx - EVENT_KEYFRAME_SIZE, ky); ctx.closePath();
-                    }
-                    ctx.fill(); ctx.stroke();
-                });
+                        ctx.beginPath();
+                        if (isHold) {
+                            // 停止キーフレームは四角形
+                            ctx.rect(kx - 4, ky - 4, 8, 8);
+                        } else if (isEase) {
+                            // イージングありは円形
+                            ctx.arc(kx, ky, EVENT_KEYFRAME_SIZE, 0, Math.PI * 2);
+                        } else {
+                            // リニアはひし形
+                            ctx.moveTo(kx, ky - EVENT_KEYFRAME_SIZE); 
+                            ctx.lineTo(kx + EVENT_KEYFRAME_SIZE, ky); 
+                            ctx.lineTo(kx, ky + EVENT_KEYFRAME_SIZE); 
+                            ctx.lineTo(kx - EVENT_KEYFRAME_SIZE, ky); 
+                            ctx.closePath();
+                        }
+                        ctx.fill(); ctx.stroke();
+                    });
+                }
                 ctx.restore();
                 currentY += EVENT_TRACK_HEIGHT;
             });
@@ -439,14 +506,10 @@ window.event_draw = function () {
     ctx.fillStyle = '#444'; ctx.fillRect(0, 0, EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
     ctx.strokeStyle = '#555'; ctx.strokeRect(0, 0, EVENT_LEFT_PANEL_WIDTH, EVENT_HEADER_HEIGHT);
 
-    // ヘッダーラベル
     ctx.fillStyle = '#aaa'; ctx.font = '10px sans-serif';
-    // 親、Linkなどのヘッダーラベルのみ描画
-    // 定数を使って描画位置も調整
     ctx.fillText("親", EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PARENT_RIGHT + 5, 18);
     ctx.fillText("Link", EVENT_LEFT_PANEL_WIDTH - UI_LAYOUT.PICK_RIGHT - 10, 18);
 
-    // インジケータ (ヘッダーの上、青文字)
     ctx.fillStyle = '#0ff';
     ctx.font = 'bold 14px monospace';
     ctx.textAlign = 'left';
@@ -457,7 +520,6 @@ window.event_draw = function () {
     const timeText = `${event_currentTime.toFixed(2)}s (${sec}s ${frame}f)`;
     ctx.fillText(timeText, 10, 20);
 
-    // --- Pick Whip ドラッグライン描画 ---
     if (event_state === 'drag-pickwhip' && event_pickWhipSourceLayerIdx !== -1 && window.event_currentMouseX !== undefined) {
         let srcY = EVENT_HEADER_HEIGHT;
         for (let i = 0; i < event_pickWhipSourceLayerIdx; i++) {

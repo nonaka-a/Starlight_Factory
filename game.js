@@ -128,6 +128,14 @@ const DataManager = {
  * --- 初期化処理 ---
  */
 window.onload = () => {
+    // フォントのロードを待ってから初期化を開始
+    document.fonts.ready.then(() => {
+        console.log("Fonts loaded. Starting game...");
+        initApp();
+    });
+};
+
+function initApp() {
     canvas = document.getElementById('game-canvas');
     ctx = canvas.getContext('2d');
 
@@ -249,7 +257,7 @@ window.onload = () => {
     }
 
     DataManager.load();
-};
+}
 
 function setupControls() {
     // 既存のsetupControlsの中身... (省略せずに記述します)
